@@ -1,0 +1,57 @@
+# Publishes the `minimoji` CLI (cli/) to npm with trusted publishing and
+# provenance: OIDC, no stored token, no 2FA prompt, and the npm page links
+# the build to this public repository. A publish is a version bump in
+# cli/package.json landing on main; a version already on npm is skipped.
+#
+# This repository is exported from Minimoji's private repo (see
+# CONTRIBUTING.md); edit this file there, at sdk/public/.github/workflows/.
+#
+# Before the first run here: npmjs.com → the package → Settings → Trusted
+# Publisher → GitHub Actions, organization hypersocialinc, repository
+# minimoji-sdk, workflow npm-publish.yml, no environment. Until then the
+# publish step fails and nothing ships.
+name: Publish CLI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - cli/package.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # npm's trusted publisher matches the repository and this file, not the
+    # branch: only main publishes, so a dispatch on a branch cannot ship it
+    if: github.repository == 'hypersocialinc/minimoji-sdk' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      # trusted publishing needs npm 11.5 or later
+      - run: npm install -g npm@latest
+      - run: node --test
+        working-directory: cli
+      - name: Publish when this version is not on npm yet
+        working-directory: cli
+        run: |
+          set -euo pipefail
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "$name@$version is already on npm, skipping"
+          else
+            echo "publishing $name@$version"
+            npm publish --access public --provenance
+          fi

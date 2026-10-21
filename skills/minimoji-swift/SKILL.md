@@ -67,6 +67,19 @@ to 17.0 or later), but every view is
 
 ## 2. The service and the keys
 
+**Getting a key.** In the app's folder, run:
+
+```sh
+npx minimoji login   # prints a code and a link; the person approves it in the browser
+npx minimoji init    # mints a publishable key, writes it to the app's Info.plist
+```
+
+`init` adds `MINIMOJI_PUBLISHABLE_KEY` and `MINIMOJI_SERVICE_URL` to the
+app's `Info.plist` (or `Minimoji.plist` when Xcode generates the plist) and
+never writes a secret key. Read them with
+`Bundle.main.object(forInfoDictionaryKey:)`. Without the CLI, mint the key at
+minimoji.com/developers/keys.
+
 - A **publishable key** (`mk_pub_…`, from minimoji.com/developers) lives in
   the app: it may bake heads, cut editor pieces, generate avatars and pick
   moods.
@@ -178,6 +191,49 @@ MinimojiMetalHeadView(document: theirs).frame(width: 96, height: 96)
 - Below 64 pt fetch `detail: .25, lite: true` and run `frameRate:
   .reduced` (34–63 pt) or `.low` (under 34 pt); see the README's size table.
 
+### Showing a head while it loads
+
+Do not draw your own placeholder: `MinimojiHeadPoster` (in `MinimojiMetal`)
+is the head's own loader, the one the website shows — the still soft and
+breathing, a cross-fade with a puff when the head is ready, the sharp still
+on an error, a plain swap under Reduce Motion. No Metal view exists until the
+head is ready, so a feed of them is cheap.
+
+```swift
+MinimojiHeadPoster(still: .url(service.renderURL(for: avatarKey, size: 256))) {
+  try await service.head(forKey: avatarKey)      // your load, your caching
+}
+.frame(width: 120, height: 120)
+```
+
+- `fit: .render` (default) lands the service's picture where the live head
+  draws under the same `framing:`; `fit: .contain` for a still of your own
+  (`.url` of a bundled file or `.image(cgImage)`, any shape, never
+  stretched), `.none` for no still. Until the head loads, `.render` places
+  the still from a typical head's estimate; pass `placementDocument:` (the
+  document from an earlier load) and it is exact from the start.
+- `head:` takes your own `MinimojiMetalHeadView(document:…)` (mood, frame
+  rate, colours); without it the head is decorative. Bump `reload:` to retry.
+- An unsaved species has no service picture: bundle a still or pass `.none`.
+
+### A species: D.A.S.H., an alien, an animal
+
+```swift
+let dash = try await service.head(for: CharacterSelection(id: "agent"))    // a fixed guide; bundled? remember(_:for:)
+let starter = try await service.head(for: CharacterSelection(id: "dashDealt", seed: installSeed))   // same seed, same face
+let cast = try await service.characters()   // ids, names, families, pick axes; SpeciesUnsupported on an old service
+```
+
+- The first, uncached bake of a species takes ~15 s on the service; it waits
+  `characterBakeTimeout` (45 s), so no timeout to raise. Later loads are cached.
+- Play it like a person: expressions, `HeadCue`, listening, presence,
+  `SpeechVoice` / `SingingVoice` through one `AvatarPerformanceInput`. No
+  per-species host code; D.A.S.H. draws the mouth on its screen.
+- `save(character:)` (backend key) gives a key that `head(forKey:)` and
+  `renderURL(for:)` take; `HeadDocument.character` tells a species from a person.
+- The editor picks species with `offersSpecies: true` (kind row; `doc` becomes
+  `{"character": …}`, `service.save(doc)` saves it); `colors:` overrides do nothing on one.
+
 ## 5. The editor
 
 ```swift
@@ -246,6 +302,12 @@ cue = HeadCue(.forMood("laugh"), generation: cues)       // one of laugh's three
 - The face never changes. One shot only: chain from `onGestureEnd`.
 - Under Reduce Motion nothing moves and `onGestureEnd` still comes on the
   next frame, so a chain advances. Do not add your own Reduce Motion check.
+- Cueing your own gestures? Pass `emotes: false`: a new `expression` then
+  plays no emote of its own (and does not cut your cue short), cues still
+  play. Do not pass `performances: false` for that: it silences cues too.
+- Over a host's beat (a `performance:` source with `beat`), a cue rides over
+  the nod and the nod keeps the beat. A singing app leaves `performances`
+  on, passes `emotes: false`, and cues a nod or a double take on its moments.
 
 ## 7. Read a mood from text
 
@@ -300,6 +362,11 @@ func performanceSnapshot(at hostTime: TimeInterval) -> AvatarPerformanceSnapshot
   itself; call `reset()` when the voice behind it changes.
 - The Kit opens no microphone and no audio session, and records or sends
   nothing.
+- Events ride the same snapshot as counters, never flags: bump
+  `blinkSequence` for a blink, `dropSequence` for the listening drop (a
+  bigger nod and a burst of notes: a pluck, a beat drop). Each fires once
+  per change and is never replayed after a stop; a drop needs the view's
+  `listening:` set, or it does nothing.
 
 ## 9. Saving
 

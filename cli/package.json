@@ -1,0 +1,15 @@
+{
+  "name": "minimoji",
+  "version": "0.1.0",
+  "description": "The Minimoji command line: sign in, mint keys, set a Swift or React app up, install the agent skills, and make Mini avatars from the terminal.",
+  "type": "module",
+  "bin": { "minimoji": "src/cli.js" },
+  "files": ["src", "README.md"],
+  "engines": { "node": ">=20" },
+  "repository": { "type": "git", "url": "git+https://github.com/hypersocialinc/minimoji-sdk.git", "directory": "cli" },
+  "homepage": "https://www.minimoji.com/developers",
+  "bugs": "https://github.com/hypersocialinc/minimoji-sdk/issues",
+  "license": "MIT",
+  "keywords": ["minimoji", "avatar", "cli"],
+  "scripts": { "test": "node --test" }
+}

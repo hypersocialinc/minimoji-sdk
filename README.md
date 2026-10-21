@@ -1,42 +1,50 @@
-# Minimoji Skills
+# Minimoji SDK
 
-Install the Minimoji Swift skill with:
+The public half of [Minimoji](https://www.minimoji.com/developers): the
+`minimoji` command line and the agent skills that teach a coding agent the
+SDK. MIT licensed.
 
-```bash
-npx skills add hypersocialinc/minimoji-skills --skill minimoji-swift
+```text
+cli/                      the minimoji CLI, published to npm as `minimoji`
+skills/
+  minimoji-swift/
+    SKILL.md              the MinimojiKit skill for Swift apps
 ```
 
-The skill integrates [MinimojiKit](https://www.minimoji.com/developers), the
-Swift package for Minimoji 3D avatar heads. It needs a publishable API key
-from [minimoji.com/developers](https://www.minimoji.com/developers) and
-access to the MinimojiKit package.
+## The CLI
 
-What the skill is for:
+```sh
+npx minimoji login           # approve the code in the browser
+npx minimoji init            # in your app's folder: a publishable key, written where the app reads it
+npx minimoji skills add      # install the skills below into your project
+```
 
-- show a Minimoji head in a SwiftUI app, on Metal or RealityKit, and its 2D picture anywhere an image goes
-- build previews on the device with the on-phone engine
-- open the avatar editor, with a selfie that becomes a new face and AI edits from words
-- cue a head gesture, read a mood from a line of text, lip-sync a head to live audio
-- save avatars through your backend and show friends' heads by key
+Node 20 or later, no dependencies. [cli/README.md](cli/README.md) has every
+command.
 
-Example requests:
+## The skills
 
-- "Add Minimoji to this app and show the user's avatar in the profile row"
-- "Open the Minimoji editor from Settings with a selfie button"
-- "Make the head do a double take when a reply lands"
-- "Lip-sync the party heads to the call audio"
+`npx minimoji skills add` copies `skills/<name>/` into your project
+(`.claude/skills/` for Claude Code, `.agents/skills/` for Codex) at a commit,
+and `npx minimoji skills update` refreshes it. Or with the `skills` tool:
 
-The skill is the one shipped inside the MinimojiKit package (`SKILL.md` at
-its root) and is copied here on each Kit tag. The package README and release
-notes are served at
+```sh
+npx skills add hypersocialinc/minimoji-sdk --skill minimoji-swift
+```
+
+The Swift skill integrates [MinimojiKit](https://www.minimoji.com/developers),
+the Swift package for Minimoji 3D avatar heads: a head in a SwiftUI app on
+Metal or RealityKit, its 2D picture, the avatar editor with selfies and AI
+edits, head gestures, moods from text and lip-sync to live audio. It needs a
+publishable key (`npx minimoji init`, or
+[minimoji.com/developers/keys](https://www.minimoji.com/developers/keys)) and
+access to the MinimojiKit package. The Kit's README and release notes are at
 [minimoji.com/developers/kit/README.md](https://www.minimoji.com/developers/kit/README.md)
 and
 [minimoji.com/developers/kit/RELEASE_NOTES.md](https://www.minimoji.com/developers/kit/RELEASE_NOTES.md).
 
-Repository layout:
+## Where this comes from
 
-```text
-skills/
-  minimoji-swift/
-    SKILL.md
-```
+This repository is exported from Minimoji's private repo on every change, so
+its history is one commit per export. Issues and pull requests are welcome:
+see [CONTRIBUTING.md](CONTRIBUTING.md).
