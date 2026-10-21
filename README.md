@@ -1,8 +1,18 @@
 # Minimoji SDK
 
-The public half of [Minimoji](https://www.minimoji.com/developers): the
-`minimoji` command line and the agent skills that teach a coding agent the
-SDK. MIT licensed.
+[Minimoji](https://www.minimoji.com) makes expressive 3D Mini avatars for
+apps, games and AI agents: a few lines of avatar JSON become a 3D head
+and a PNG picture, from one HTTPS API.
+
+This is the public half of it: the `minimoji` command line and the agent
+skills that teach a coding agent the SDK. MIT licensed.
+
+- [Developer portal](https://www.minimoji.com/developers): keys, platforms and the cast
+- [API reference](https://www.minimoji.com/developers/docs) (also
+  [as Markdown](https://www.minimoji.com/developers/docs.md), and
+  [llms.txt](https://www.minimoji.com/llms.txt) for coding agents)
+- [`minimoji` on npm](https://www.npmjs.com/package/minimoji)
+- [Preview any avatar live](https://www.minimoji.com/preview)
 
 ```text
 cli/                      the minimoji CLI, published to npm as `minimoji`
@@ -19,6 +29,7 @@ skills/
 npx minimoji login           # approve the code in the browser
 npx minimoji init            # in your app's folder: a publishable key, written where the app reads it
 npx minimoji skills add      # install the skills below into your project
+npx minimoji generate "red curls, round glasses" --open   # make a head and see it live
 ```
 
 Node 20 or later, no dependencies. [cli/README.md](cli/README.md) has every
@@ -51,6 +62,12 @@ The web skill integrates `@minimoji/react`: live heads and characters
 lip-sync and emotes from a recorded line or audio, moods, gestures,
 listening and presence. The package is not on npm yet: ask Minimoji for
 access.
+
+## Licence
+
+MIT: see [LICENSE](LICENSE). The API (with a key), the CLI and these
+skills are open to anyone; the Swift package and `@minimoji/react` are for partners,
+by request, for now.
 
 ## Where this comes from
 

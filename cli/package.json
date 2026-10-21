@@ -10,6 +10,6 @@
   "homepage": "https://www.minimoji.com/developers",
   "bugs": "https://github.com/hypersocialinc/minimoji-sdk/issues",
   "license": "MIT",
-  "keywords": ["minimoji", "avatar", "cli"],
+  "keywords": ["minimoji", "avatar", "3d avatar", "avatar api", "lip sync", "talking avatar", "ai agent avatar", "agent skills", "react", "swiftui", "cli"],
   "scripts": { "test": "node --test" }
 }

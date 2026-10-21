@@ -1,13 +1,25 @@
 # minimoji
 
-The Minimoji command line. Sign a terminal in, mint API keys, set an iOS or
+[Minimoji](https://www.minimoji.com) makes expressive 3D Mini avatars for
+apps, games and AI agents: people, and characters such as D.A.S.H. A few
+lines of avatar JSON become a 3D head (GLB) and a PNG picture, from one
+HTTPS API, and the SDKs make the head talk and emote.
+
+This is its command line. Sign a terminal in, mint API keys, set an iOS or
 React app up with a key, install the Minimoji agent skills, and make Mini
 avatars from the terminal. Node 20 or later, no dependencies.
+
+- Docs: [minimoji.com/developers](https://www.minimoji.com/developers), the
+  [API reference](https://www.minimoji.com/developers/docs) and
+  [llms.txt](https://www.minimoji.com/llms.txt) for coding agents
+- See any avatar live: [minimoji.com/preview](https://www.minimoji.com/preview)
+- Source and skills: [hypersocialinc/minimoji-sdk](https://github.com/hypersocialinc/minimoji-sdk)
 
 ```sh
 npx minimoji login           # approve the code in the browser
 npx minimoji init            # in your app's folder: a publishable key, written where the app reads it
 npx minimoji skills add      # teach your coding agent the SDK
+npx minimoji generate "red curls, round glasses" --open   # make a head and see it live
 ```
 
 ## Signing in
