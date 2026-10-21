@@ -30,7 +30,7 @@ release note. Link only the products you use:
 packages:
   MinimojiKit:
     url: https://github.com/hypersocialinc/MinimojiKit
-    from: "9.4.0"
+    from: "9.41.0"
 targets:
   YourApp:
     dependencies:
@@ -49,7 +49,7 @@ targets:
 ```
 
 In Xcode without xcodegen: File → Add Package Dependencies, the same URL,
-"Up to Next Major" from 9.4.0, and tick the same products. `MinimojiLive`
+"Up to Next Major" from 9.41.0, and tick the same products. `MinimojiLive`
 (live lip-sync, section 8) is a seventh product.
 
 | you want | link |
@@ -58,6 +58,9 @@ In Xcode without xcodegen: File → Add Package Dependencies, the same URL,
 | the editor | add `MinimojiEditor`, `MinimojiEditorUI` |
 | previews built on the phone | add `MinimojiEngine` |
 | lip-sync from a live call's audio | add `MinimojiLive` |
+
+Older than 9.38 lacks `MinimojiHeadPoster(placementDocument:)` (and before
+9.39 its still draws too big); older than 9.25 has no species.
 
 **iOS 18 gate.** The package links from iOS 17 (set your deployment target
 to 17.0 or later), but every view is
@@ -188,6 +191,8 @@ let theirs = try await service.head(forKey: theirKey)
 MinimojiMetalHeadView(document: theirs).frame(width: 96, height: 96)
 ```
 
+- A head's first `expression` is on in full from frame one (no blend, no
+  emote); later changes blend and emote.
 - Below 64 pt fetch `detail: .25, lite: true` and run `frameRate:
   .reduced` (34–63 pt) or `.low` (under 34 pt); see the README's size table.
 
@@ -211,7 +216,9 @@ MinimojiHeadPoster(still: .url(service.renderURL(for: avatarKey, size: 256))) {
   (`.url` of a bundled file or `.image(cgImage)`, any shape, never
   stretched), `.none` for no still. Until the head loads, `.render` places
   the still from a typical head's estimate; pass `placementDocument:` (the
-  document from an earlier load) and it is exact from the start.
+  document from an earlier load) and it is exact from the start. Long
+  hair under `.face`, the penguin and the ghost miss the estimate by up to
+  a quarter: pass it for those.
 - `head:` takes your own `MinimojiMetalHeadView(document:…)` (mood, frame
   rate, colours); without it the head is decorative. Bump `reload:` to retry.
 - An unsaved species has no service picture: bundle a still or pass `.none`.
@@ -232,7 +239,8 @@ let cast = try await service.characters()   // ids, names, families, pick axes; 
 - `save(character:)` (backend key) gives a key that `head(forKey:)` and
   `renderURL(for:)` take; `HeadDocument.character` tells a species from a person.
 - The editor picks species with `offersSpecies: true` (kind row; `doc` becomes
-  `{"character": …}`, `service.save(doc)` saves it); `colors:` overrides do nothing on one.
+  `{"character": …}`, `service.save(doc)` saves it, `CharacterSelection(document: doc)`
+  reads it back, nil for a person); `colors:` overrides do nothing on one.
 
 ## 5. The editor
 
@@ -256,7 +264,7 @@ With the built-in selfie camera and AI edit:
 ```swift
 MinimojiEditorView(service: service, doc: $doc, head: $head,
                    imports: .kit(camera: true),
-                   shuffleHeads: cast.map(\.document),   // optional: the heads the shuffle turns through
+                   shuffleHeads: shuffle,                 // optional: [HeadDocument], the heads the shuffle turns through
                    proposalOpen: $stageBusy)              // true while the camera, the read or a new face owns the stage
 ```
 
@@ -305,9 +313,13 @@ cue = HeadCue(.forMood("laugh"), generation: cues)       // one of laugh's three
 - Cueing your own gestures? Pass `emotes: false`: a new `expression` then
   plays no emote of its own (and does not cut your cue short), cues still
   play. Do not pass `performances: false` for that: it silences cues too.
+  `bursts: false` drops only the stickers that pop on a mood change.
 - Over a host's beat (a `performance:` source with `beat`), a cue rides over
   the nod and the nod keeps the beat. A singing app leaves `performances`
   on, passes `emotes: false`, and cues a nod or a double take on its moments.
+- A recorded line's cue track (`{at, mood}` / `{at, gesture}`) plays
+  through `SpeechCueTrack`: `cues(since:through:)` each frame, `held(at:)`
+  on a seek.
 
 ## 7. Read a mood from text
 
@@ -346,11 +358,26 @@ func render(pcm: UnsafeBufferPointer<Float>) {
 
 // in each head's performance source, on the main actor:
 func performanceSnapshot(at hostTime: TimeInterval) -> AvatarPerformanceSnapshot {
+  let dt = hostTime - lastTime; lastTime = hostTime        // your own frame step
   let (viseme, level) = visemes.now(at: hostTime)    // a pure read: every head of this voice gets the same answer
   return AvatarPerformanceSnapshot(mouth: voice.sample(dt: dt, viseme: viseme, level: level), voiceLevel: viseme == nil ? nil : level)
 }
 ```
 
+- Fed speech is all it takes: the mouth articulates (lips meet on
+  `.shut`), the head breathes in the phrase gaps, and natural talk glances
+  aside, follows pitch and nods at phrase ends. All on by default, no host
+  code; the views have no switch for them (the opt-outs and
+  `FaceLife.inhale(length:lead:)` are on a `FaceLife` you drive yourself).
+  `SpeechVoice(articulate: false)` / `LiveVisemes(…, articulate: false)`
+  bring back the pre-9.40 mouth.
+- Pitch is off by default (it costs CPU). With `LiveVisemes(sampleRate:
+  48_000, pitch: true)`, read `let (viseme, level, pitch) =
+  visemes.voice(at: hostTime)` and pass `voice.sample(dt:viseme:level:pitch:)`,
+  so natural talk's brows follow it.
+- A head that hears someone else: feed `heardVoice: HeardVoice(level:pitch:look:)`
+  in its snapshot every frame (`level: 0` through pauses, `nil` on the
+  speaking head); a feed 300 ms stale releases.
 - The performance source is an `@MainActor` class conforming to
   `AvatarPerformanceInput`, held once per head and passed as
   `performance:` with `talking: true`.
@@ -360,13 +387,115 @@ func performanceSnapshot(at hostTime: TimeInterval) -> AvatarPerformanceSnapshot
 - One `LiveVisemes` per voice (any number of heads read it), one
   `SpeechVoice` per head. A gap in arrivals (DTX, a mute) re-anchors by
   itself; call `reset()` when the voice behind it changes.
-- The Kit opens no microphone and no audio session, and records or sends
-  nothing.
+- `LiveVisemes` opens no microphone and no audio session, and records or
+  sends nothing (only `MinimojiLinePlayer` sets `.ambient`, and you can opt
+  out).
 - Events ride the same snapshot as counters, never flags: bump
   `blinkSequence` for a blink, `dropSequence` for the listening drop (a
   bigger nod and a burst of notes: a pluck, a beat drop). Each fires once
   per change and is never replayed after a stop; a drop needs the view's
   `listening:` set, or it does nothing.
+
+### Say a line: one call (`MinimojiLinePlayer`)
+
+A recorded line is its audio plus a **line** (`SpeechLine`: the public
+format in `docs/speech-line-format.md`, the same JSON the website plays:
+mouth frames, captions, optional timed words, mood and gesture cues).
+`MinimojiLinePlayer` plays it on a head, and `MinimojiCaptions` shows its
+words. They arrive in Kit 9.44.0 (pin from it); iOS 18 / macOS 15 for the
+views.
+
+```swift
+import SwiftUI
+import MinimojiKit
+import MinimojiMetal
+
+@available(iOS 18, macOS 15, *)
+struct DashSaysHey: View {
+  let head: HeadDocument
+  let line: SpeechLine                       // try SpeechLine(json: data), from your bundle or server
+  let audio: URL
+  @StateObject private var host = MinimojiLinePlayer()   // hold it: captions read its published state
+
+  var body: some View {
+    VStack {
+      Button { host.say(line, audio: audio) } label: {
+        MinimojiMetalHeadView(document: head, linePlayer: host, framing: .face)
+      }
+      .accessibilityLabel("Replay")
+      MinimojiCaptions(player: host)
+    }
+  }
+}
+```
+
+- **The head view takes the player** (`linePlayer:`): the mouth on the
+  audio's clock, the line's strong mood cues as emotes, quiet ones (k under
+  0.35) as a face change only, gestures as cues. The view's own emotes are
+  off while it speaks, so the line's cues are the only ones.
+- **Never hangs.** No audio, an `AVAudioPlayer` that can't be made or won't
+  play, a sound that stops short, or a clock that stalls (1.5 s; 4 s before
+  it first moves): the line carries on a silent clock, and the mouth and
+  captions still run and end. Audio errors are logged.
+- **The newest `say` wins** (a generation token): it cuts the line before
+  it, and the old one's callbacks do nothing. `stop()` ends a line;
+  `await host.speak(line, audio:)` returns `.ended` or `.stopped`, and
+  cancelling its task stops the line. Never stop on `onDisappear`, which
+  can fire after the next screen's `onAppear` and cut off its line.
+- **Audio session `.ambient` by default**: it mixes, respects the silent
+  switch, and never ducks or interrupts the person's own audio.
+  `MinimojiLinePlayer(audioSession: .leaveAlone)` keeps your session.
+- **Captions**: about 7 words / 40 characters, newest opaque, older
+  fading; Reduce Motion shows the whole line at once; VoiceOver announces
+  each line once, and the moving words are hidden from it. They must survive
+  large Dynamic Type (shrink a headline beside the head instead).
+- **Building a line on the device**, offline (a voice note, a status):
+  `try SpeechLine.build(audioFile: url, words: words, mood: "happy")`
+  (`MinimojiLive`), with `words` as `[SpeechLine.Word(text:start:end:)]`
+  from your TTS provider's timestamps or on-device dictation. Without
+  words, pass `transcript:` for one caption, or neither. It matches the
+  website's builder; a 10 s line takes a fraction of a second. Never derive
+  mouth shapes from letters.
+
+### A host that talks (onboarding, tours)
+
+A character that says one line per screen: `MinimojiLinePlayer` plus a
+few rules.
+
+- **One line per screen.** Start it on appear after a 250–500 ms lead-in;
+  tapping the head replays it. Pick lines at random, never the same one
+  twice in a row.
+- **Load the host early** (a character bake is about 5 MB). Show
+  `MinimojiHeadPoster` until it is ready: it retries a failed load while on
+  screen (2 s, doubling to 30 s), and `session: true` keeps the loaded head
+  for the session so it is live at once when it comes back.
+- Hide off-screen duplicate heads from VoiceOver.
+- Under `.face` framing a character like D.A.S.H. reads about 10% larger
+  than a person's head in the same frame.
+
+```swift
+@available(iOS 18, macOS 15, *)
+struct OnboardingHost: View {
+  let head: HeadDocument
+  let line: SpeechLine
+  let audio: URL
+  @StateObject private var host = MinimojiLinePlayer(restingExpression: "happy")
+
+  var body: some View {
+    VStack {
+      Button { host.say(line, audio: audio) } label: {
+        MinimojiMetalHeadView(document: head, linePlayer: host, framing: .face)
+      }
+      .accessibilityLabel("Replay")
+      MinimojiCaptions(player: host)
+    }
+    .task {                                    // cancelled with the view; the generation token guards the rest
+      try? await Task.sleep(for: .milliseconds(350))
+      _ = await host.speak(line, audio: audio)
+    }
+  }
+}
+```
 
 ## 9. Saving
 
@@ -394,11 +523,13 @@ The response's `avatarKey` is what you store; `renderURL(for:size:)` and
 - Use the `.convex.site` origin, not `.convex.cloud`.
 - Service errors are `AvatarService.Fail` (transport errors such as
   `URLError`, and `CancellationError`, pass through as they are): `.rejected` (a `400`, e.g. no face in the
-  photo), `.limited(retryAfterMs: Int, String)` (a `429`), `.service`, `.reply`.
+  photo), `.limited(retryAfterMs: Int, String)` (a `429`), `.service(String)`, `.reply(status:body:)`. On an old service `characters()`,
+  `head(for: CharacterSelection)` and `save(character:)` throw
+  `AvatarService.SpeciesUnsupported`.
 
 ## 11. Web twin
 
 The same calls exist for React in `@minimoji/react`: `MinimojiHead` takes
 `cue={{ gesture: 'double-take', generation }}` or `{ mood: 'laugh' }` and
 `onGestureEnd`, and the engine's `createLiveVisemeTimeline` is what
-`LiveVisemes` ports. Integrate the web side from that package's own docs.
+`LiveVisemes` ports. Integrate the web side with the `minimoji-web` skill.

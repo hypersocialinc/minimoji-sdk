@@ -45,7 +45,8 @@ It mints a **publishable** key labelled after the project, keeps one that is
 already there (`--force` mints a new one), and never writes a secret key into
 an app: a secret key it finds there is replaced, and it tells you to revoke
 it. `--platform swift|web` settles a folder that is both; `--plist` picks
-the plist; `--with-skill` also installs the Swift skill. The packages are
+the plist; `--with-skill` also installs the platform's skill (`minimoji-swift` or
+`minimoji-web`). The packages are
 not public yet (MinimojiKit is a private GitHub repo, `@minimoji/react` is
 not on npm), so `init` prints the install step rather than running it.
 

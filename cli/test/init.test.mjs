@@ -151,3 +151,49 @@ test("plist and yml edits: an empty <string/> is replaced, a missing service URL
   assert.equal(upsertYml("      properties:\n        MINIMOJI_PUBLISHABLE_KEY: x\n", "MINIMOJI_SERVICE_URL", "https://s"), "      properties:\n        MINIMOJI_PUBLISHABLE_KEY: x\n        MINIMOJI_SERVICE_URL: https://s\n");
   assert.equal(upsertEnv("A=1\n\nK=old\n", "K", "new"), "A=1\n\nK=new\n");
 });
+
+/** a service that mints, and GitHub's API and raw files for minimoji-sdk with both platform skills */
+async function mintingWithSkills() {
+  const sha = "3".repeat(40);
+  const skill = (name) => `---\nname: ${name}\ndescription: ${name}.\n---\n\n# ${name}\n`;
+  return fixtureServer({
+    "POST /cli/keys": (c) => ({ json: { key: pub("1"), prefix: prefixOf(pub("1")), kind: c.body.kind } }),
+    "GET /repos/hypersocialinc/minimoji-sdk/commits/main": () => ({ body: sha, headers: { "Content-Type": "text/plain" } }),
+    "GET /repos/hypersocialinc/minimoji-sdk/git/trees/*": () => ({ json: { tree: ["minimoji-swift", "minimoji-web"].map((n) => ({ path: `skills/${n}/SKILL.md`, type: "blob" })) } }),
+    "GET /hypersocialinc/minimoji-sdk/*": (c) => ({ body: skill(c.path.split("/")[5]) }),
+  });
+}
+
+test("init --with-skill installs the platform's skill: minimoji-web in a web app, minimoji-swift in a Swift one", async () => {
+  for (const [files, name, other] of [
+    [{ "package.json": JSON.stringify({ dependencies: { next: "16", react: "19" } }), ".claude/": "" }, "minimoji-web", "minimoji-swift"],
+    [{ "Package.swift": "", ".claude/": "" }, "minimoji-swift", "minimoji-web"],
+  ]) {
+    const svc = await mintingWithSkills();
+    const cwd = await project(files);
+    const ctx = await makeCtx({ cwd, env: { MINIMOJI_SKILLS_API: svc.url, MINIMOJI_SKILLS_RAW: svc.url } });
+    await signIn(ctx, svc.url);
+    const r = await run(ctx, ["init", "--base", svc.url, "--json", "--with-skill"]);
+    await svc.close();
+    assert.equal(r.code, 0, r.json?.error);
+    assert.deepEqual(r.json.skills.installed.map((s) => s.name), [name]);
+    assert.match(await readFile(join(cwd, `.claude/skills/${name}/SKILL.md`), "utf8"), new RegExp(`# ${name}\\n`));
+    await assert.rejects(readFile(join(cwd, `.claude/skills/${other}/SKILL.md`)), { code: "ENOENT" });
+    assert.ok(!r.json.next.some((n) => n.includes("skills add")), "the installed skill is not suggested again");
+  }
+});
+
+test("init --with-skill still reports the key it wrote when the skill cannot be fetched, and says how to add it", async () => {
+  const svc = await minting();
+  const cwd = await project({ "package.json": JSON.stringify({ dependencies: { vite: "7", react: "19" } }), ".claude/": "" });
+  // GitHub answers nothing here: the skills API is the minting service, which has no such route
+  const ctx = await makeCtx({ cwd, env: { MINIMOJI_SKILLS_API: svc.url, MINIMOJI_SKILLS_RAW: svc.url } });
+  await signIn(ctx, svc.url);
+  const r = await run(ctx, ["init", "--base", svc.url, "--json", "--with-skill"]);
+  await svc.close();
+  assert.equal(r.code, 0, r.json?.error);
+  assert.equal(r.json.skills, null);
+  assert.match(r.json.skillError, /fetching .* failed/);
+  assert.match(await readFile(join(cwd, ".env.local"), "utf8"), /^VITE_MINIMOJI_KEY=mk_pub_/m);
+  assert.ok(r.json.next.includes("Teach your coding agent the React package: minimoji skills add minimoji-web."));
+});

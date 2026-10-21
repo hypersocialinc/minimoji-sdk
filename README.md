@@ -9,6 +9,8 @@ cli/                      the minimoji CLI, published to npm as `minimoji`
 skills/
   minimoji-swift/
     SKILL.md              the MinimojiKit skill for Swift apps
+  minimoji-web/
+    SKILL.md              the @minimoji/react skill for web apps
 ```
 
 ## The CLI
@@ -30,6 +32,7 @@ and `npx minimoji skills update` refreshes it. Or with the `skills` tool:
 
 ```sh
 npx skills add hypersocialinc/minimoji-sdk --skill minimoji-swift
+npx skills add hypersocialinc/minimoji-sdk --skill minimoji-web
 ```
 
 The Swift skill integrates [MinimojiKit](https://www.minimoji.com/developers),
@@ -42,6 +45,12 @@ access to the MinimojiKit package. The Kit's README and release notes are at
 [minimoji.com/developers/kit/README.md](https://www.minimoji.com/developers/kit/README.md)
 and
 [minimoji.com/developers/kit/RELEASE_NOTES.md](https://www.minimoji.com/developers/kit/RELEASE_NOTES.md).
+
+The web skill integrates `@minimoji/react`: live heads and characters
+(D.A.S.H., the aliens, the animals) on a web page, the head's loader,
+lip-sync and emotes from a recorded line or audio, moods, gestures,
+listening and presence. The package is not on npm yet: ask Minimoji for
+access.
 
 ## Where this comes from
 

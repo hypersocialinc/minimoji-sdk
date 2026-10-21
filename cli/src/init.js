@@ -65,9 +65,14 @@ export async function init(ctx, base, opts, out) {
   if (!PUBLISHABLE.test(key)) throw new CliError("refusing to write a key that is not a publishable mk_pub_ key into an app");
   const wrote = await target.write(key, base);
 
-  let skills = null;
-  if (opts["with-skill"] && project.platform === "web") ctx.stderr("There is no web skill yet; --with-skill installs the Swift one only.\n");
-  if (opts["with-skill"] && project.platform === "swift") skills = await addSkills(ctx, opts, ["minimoji-swift"]);
+  // the key is written by now: a skill that cannot be fetched is reported, not a failed init
+  let skills = null, skillError = null;
+  if (opts["with-skill"]) {
+    try { skills = await addSkills(ctx, opts, [SKILL_FOR[project.platform]]); } catch (error) {
+      if (!(error instanceof CliError)) throw error;
+      skillError = error.message;
+    }
+  }
   const next = nextSteps(project, target).filter((n) => !(skills && n.includes("skills add")));
   const human = [
     `${project.name}: a ${project.platform === "web" ? `${{ next: "Next.js", vite: "Vite", react: "React" }[project.framework]} app` : `Swift project (${project.framework})`}.`,
@@ -76,11 +81,12 @@ export async function init(ctx, base, opts, out) {
     ...(replacedSecret ? ["Replaced a SECRET key that was in the app: revoke it with minimoji keys revoke, it has shipped wherever this file went."] : []),
     ...wrote.map((w) => `Wrote ${w.vars.join(" and ")} to ${relative(cwd, w.file) || w.file}.`),
     ...(skills ? skills.installed.map((s) => `Installed the ${s.name} skill in ${relative(cwd, s.dir)}.`) : []),
+    ...(skillError ? [`Did not install the ${SKILL_FOR[project.platform]} skill: ${skillError}.`] : []),
     "",
     "Next:",
     ...next.map((n) => `  ${n}`),
   ];
-  return out({ project, key: { prefix: minted?.prefix ?? `${key.slice(0, 11)}…${key.slice(-4)}`, kind: "publishable", minted: Boolean(minted) }, replacedSecret, wrote: wrote.map((w) => ({ ...w, file: relative(cwd, w.file) })), skills, next }, human.join("\n"));
+  return out({ project, key: { prefix: minted?.prefix ?? `${key.slice(0, 11)}…${key.slice(-4)}`, kind: "publishable", minted: Boolean(minted) }, replacedSecret, wrote: wrote.map((w) => ({ ...w, file: relative(cwd, w.file) })), skills, ...(skillError ? { skillError } : {}), next }, human.join("\n"));
 }
 
 async function webTarget(cwd, project) {
@@ -139,6 +145,9 @@ async function swiftTarget(cwd, project, opts) {
   };
 }
 
+/** the agent skill `--with-skill` installs for each platform */
+const SKILL_FOR = { web: "minimoji-web", swift: "minimoji-swift" };
+
 function nextSteps(project, target) {
   if (project.platform === "web") {
     return [
@@ -146,6 +155,7 @@ function nextSteps(project, target) {
       ...(project.framework === "react" ? ["Unprefixed variables are not shown to a browser bundle: rename them for your bundler (REACT_APP_…, EXPO_PUBLIC_…) if it needs a prefix."] : []),
       "@minimoji/react is not on npm yet: ask Minimoji for access before adding it.",
       "Saving avatars (POST /avatars) needs a secret key on your server: minimoji keys create --kind secret.",
+      "Teach your coding agent the React package: minimoji skills add minimoji-web.",
     ];
   }
   const read = target.ownPlist
