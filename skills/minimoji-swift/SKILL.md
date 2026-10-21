@@ -217,8 +217,13 @@ MinimojiHeadPoster(still: .url(service.renderURL(for: avatarKey, size: 256))) {
   stretched), `.none` for no still. Until the head loads, `.render` places
   the still from a typical head's estimate; pass `placementDocument:` (the
   document from an earlier load) and it is exact from the start. Long
-  hair under `.face`, the penguin and the ghost miss the estimate by up to
-  a quarter: pass it for those.
+  hair under `.face` misses the estimate by up to a third: pass it for those.
+- **A curated character** (D.A.S.H., an alien, an animal, the penguin, the
+  ghost): pass `character: CharacterSelection(id: "agent")` and the still is
+  exact on a cold load too (the Kit keeps every catalogue character's
+  measures). A still of your own framed your own way: `placementHint:
+  HeadPosterPlacement(side:dy:)` (fractions of the view's height) places it
+  there throughout.
 - `head:` takes your own `MinimojiMetalHeadView(document:…)` (mood, frame
   rate, colours); without it the head is decorative. Bump `reload:` to retry.
 - An unsaved species has no service picture: bundle a still or pass `.none`.
@@ -415,7 +420,7 @@ struct DashSaysHey: View {
   let head: HeadDocument
   let line: SpeechLine                       // try SpeechLine(json: data), from your bundle or server
   let audio: URL
-  @StateObject private var host = MinimojiLinePlayer()   // hold it: captions read its published state
+  @StateObject private var host = MinimojiLinePlayer()   // made once: the view struct is rebuilt, the player is not
 
   var body: some View {
     VStack {
@@ -445,9 +450,15 @@ struct DashSaysHey: View {
 - **Audio session `.ambient` by default**: it mixes, respects the silent
   switch, and never ducks or interrupts the person's own audio.
   `MinimojiLinePlayer(audioSession: .leaveAlone)` keeps your session.
-- **Captions**: about 7 words / 40 characters, newest opaque, older
-  fading; Reduce Motion shows the whole line at once; VoiceOver announces
-  each line once, and the moving words are hidden from it. They must survive
+- **Captions** (`MinimojiCaptions(player:)` observes the player itself):
+  phrases by default — at most four words, broken after punctuation, the
+  word being said lit and staying lit through the pause after it; the first
+  phrase shows before the voice starts and the last stays a second after it
+  ends; a new phrase pushes up. `style: .window` is Kit 9.44's sliding window
+  (about 7 words / 40 characters), to pin the old look. Reduce Motion shows
+  the whole line at once: give a subtitle slot `maxLines: 1` or `height:`
+  and a long line shrinks to fit, then truncates. VoiceOver announces each
+  line once, and the moving words are hidden from it. They must survive
   large Dynamic Type (shrink a headline beside the head instead).
 - **Building a line on the device**, offline (a voice note, a status):
   `try SpeechLine.build(audioFile: url, words: words, mood: "happy")`
@@ -456,6 +467,11 @@ struct DashSaysHey: View {
   words, pass `transcript:` for one caption, or neither. It matches the
   website's builder; a 10 s line takes a fraction of a second. Never derive
   mouth shapes from letters.
+- **`mood:` sets the opening face quietly** (no emote burst at the line's
+  start). **Audio tags** in the words or transcript (ElevenLabs'
+  `[excited]`, `[curious]`, `[whispers]`…) leave the captions and become
+  quiet face changes at their word (`SpeechLine.tagMoods`); `[laughs]` plays
+  the laugh. Pass the provider's words as they come.
 
 ### A host that talks (onboarding, tours)
 
@@ -471,7 +487,64 @@ few rules.
   for the session so it is live at once when it comes back.
 - Hide off-screen duplicate heads from VoiceOver.
 - Under `.face` framing a character like D.A.S.H. reads about 10% larger
-  than a person's head in the same frame.
+  than a person's head in the same frame. Give its poster `character:` so
+  the still lands exactly on it.
+- **Never break the host.** A missing clip, a line that won't decode, an
+  audio error: fall back to the still head or the silent clock (`say(line,
+  audio: nil)` still moves the mouth and captions), log it under one
+  category, and never block the screen on it. The player already never hangs.
+- **Own long-lived things in a reference object made once** (`@StateObject`,
+  or your screen's model): the player, a tilt or motion source, the loaded
+  head. Not in a SwiftUI view struct, which is rebuilt every update. Decode
+  each line's JSON once per process and keep it.
+- **Post-processing the provider's audio** (a robot filter, a pitch shift)
+  must keep the exact duration: pad or trim back to the raw recording's
+  sample count, or every word timing drifts against the mouth and captions.
+- **VoiceOver** hears the line once (`MinimojiCaptions` announces it) and
+  never the captions word by word. Skipping the audio under VoiceOver, so
+  the voice doesn't talk over the screen reader, is an option, not the rule
+  (`UIAccessibility.isVoiceOverRunning`).
+
+#### A host on a sign-in screen (before auth)
+
+No key, no network: bundle the character's GLB (its bake, fetched from the
+service once at build time and added to your app), its lines and their
+audio, and draw it with `MinimojiMetalHeadView`. Nothing here calls
+`AvatarService`.
+
+```swift
+@MainActor final class SignInHost: ObservableObject {   // made once, owned by the screen
+  let player = MinimojiLinePlayer(restingExpression: "happy")
+  private(set) var head: HeadDocument?
+  private(set) var hello: SpeechLine?
+  init() {
+    // decoded once; a missing or bad file leaves the screen without a host, never broken
+    head = Bundle.main.url(forResource: "agent", withExtension: "glb")
+      .flatMap { try? GLB.decodeHead(Data(contentsOf: $0)) }
+    hello = Bundle.main.url(forResource: "hello", withExtension: "line.json")
+      .flatMap { try? SpeechLine(json: Data(contentsOf: $0)) }
+  }
+}
+
+@available(iOS 18, macOS 15, *)
+struct SignInScreen: View {
+  @StateObject private var host = SignInHost()
+  var body: some View {
+    VStack {
+      if let head = host.head {
+        MinimojiMetalHeadView(document: head, linePlayer: host.player, framing: .face).frame(height: 200)
+        MinimojiCaptions(player: host.player, maxLines: 1)
+      }
+      // … the sign-in form, never waiting on the host
+    }
+    .task {
+      guard let line = host.hello else { return }
+      try? await Task.sleep(for: .milliseconds(350))
+      _ = await host.player.speak(line, audio: Bundle.main.url(forResource: "hello", withExtension: "m4a"))   // nil: the silent clock
+    }
+  }
+}
+```
 
 ```swift
 @available(iOS 18, macOS 15, *)

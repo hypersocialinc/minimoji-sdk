@@ -220,15 +220,23 @@ export function DashSaysHey() {
   and unmounting end it.
 - **`audio`**: a URL (the hook makes and frees the element), your own
   `HTMLAudioElement` (paused, never freed), or none (the silent clock).
-- **Captions**: about 7 words / 40 characters, newest opaque, older
-  fading; reduced motion shows the whole line, still; a screen reader
-  hears the whole line once per line (the moving words are hidden from
-  it). Style the box with `className` / `style`; it must survive 200% text.
+- **Captions**: phrases by default — at most four words, broken after
+  punctuation, the word being said lit (`data-lit`) and staying lit through
+  the pause after it; the first phrase shows before the voice starts and the
+  last stays a second after it ends; a new phrase moves up. `mode="window"`
+  is the Kit 9.44 sliding window (about 7 words / 40 characters). Reduced
+  motion shows the whole line, still; `maxLines={1}` keeps it to a subtitle
+  slot (then an ellipsis). A screen reader hears the whole line once per
+  line (the moving words are hidden from it). Style the box with
+  `className` / `style`; it must survive 200% text.
 - **Making a line** from your own audio and timed words (a TTS provider's
   timestamps, dictation): `buildLine({ pcm, sampleRate, words, mood })` from
   `@minimoji/engine/line`, offline; `packages/engine/dev/line-from-words.mjs`
   converts ElevenLabs-style `{ text, startMs, durationMs }` words plus the
-  clips. Never derive mouth shapes from letters.
+  clips. Never derive mouth shapes from letters. `mood` sets the opening
+  face quietly (no emote burst at the start); audio tags in the words
+  (`[excited]`, `[curious]`, `[whispers]`…) leave the captions and become
+  quiet face changes at their word (`TAG_MOODS`), `[laughs]` a laugh.
 
 ### Driving the mouth yourself (your own clock)
 
@@ -348,6 +356,22 @@ A character that says one line per screen: `useLine` plus a few rules.
   `MinimojiHeadPoster` until it lands (section 3).
 - A character like D.A.S.H. reads about 10% larger than a person in the
   same anchor: size its anchor down a little.
+- **Never break the host.** A missing clip, a line that won't parse, an
+  audio error: fall back to the still head or the silent clock
+  (`say(line)` with no audio still moves the mouth and captions), log it
+  under one prefix, and never block the page on it.
+- **Own long-lived things once**: the `useLine()` player in the component
+  that stays mounted (or a module-level store), each line's JSON fetched and
+  parsed once per page load, not per render.
+- **Post-processing the provider's audio** (a robot filter, a pitch shift)
+  must keep the exact duration: pad or trim back to the raw recording's
+  sample count, or every word timing drifts against the mouth and captions.
+- **Screen readers** hear the line once (`<MinimojiCaptions>` announces it),
+  never the captions word by word. Skipping the audio while a screen reader
+  runs is an option, not the rule.
+- **A host on a sign-in page** (before auth): a character builds on the page
+  from its id, so it needs no key and no network beyond your own bundle:
+  ship its lines and clips with the page, and the form never waits on it.
 
 ```tsx
 'use client';
