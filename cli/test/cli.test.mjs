@@ -47,7 +47,9 @@ test("the package is publishable on its own: a bin, no workspace references, and
   assert.equal(pkg.private, undefined);
   assert.doesNotMatch(JSON.stringify(pkg), /workspace:/);
   assert.deepEqual(Object.keys(pkg.dependencies ?? {}), [], "no runtime dependencies");
-  const [packed] = JSON.parse(execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], { cwd: pkgDir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }));
+  // npm 11 answers a list of packs, npm 12 an object keyed by package name
+  const out = JSON.parse(execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], { cwd: pkgDir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }));
+  const packed = Array.isArray(out) ? out[0] : out[pkg.name];
   const files = packed.files.map((f) => f.path).sort();
   for (const f of files) assert.match(f, /^(src\/[\w-]+\.js|README\.md|LICENSE|package\.json)$/, f);
   assert.ok(files.includes("src/cli.js") && files.includes("README.md"));
