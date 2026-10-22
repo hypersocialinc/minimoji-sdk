@@ -477,6 +477,51 @@ export function Reacting({ avatar }: { avatar: AvatarInput }) {
   `{ text, gesture: true }` answers `expression` (null: keep the face) and
   a `gesture`. Ask on a typing pause, never per keystroke.
 
+### Poke and drag
+
+```tsx
+'use client';
+import { useRef } from 'react';
+import { MinimojiStage, MinimojiHead, type AvatarInput, type MinimojiHeadHandle } from '@minimoji/react';
+
+export function Pokeable({ avatar }: { avatar: AvatarInput }) {
+  const anchor = useRef<HTMLDivElement>(null);
+  const head = useRef<MinimojiHeadHandle>(null);
+  return (
+    <>
+      <div ref={anchor} data-minimoji="loading" style={{ position: 'relative', width: 160, height: 160 }} />
+      <button type="button" onClick={() => head.current?.react('giggle')}>Tickle</button>
+      <MinimojiStage>
+        <MinimojiHead ref={head} avatar={avatar} anchor={anchor}
+          interactive={{ poke: { reactions: ['oof', 'ah', 'flinch', 'dizzy'] }, drag: { maxPx: 60 }, label: 'Poke Dash' }}
+          onPoke={({ reaction }) => console.log('poked:', reaction)}
+          onDragEnd={({ distance, flung }) => console.log(distance, flung)} />
+      </MinimojiStage>
+    </>
+  );
+}
+```
+
+- `interactive` is off by default (no listener is attached); `interactive` alone (true) turns on both
+  poke and drag. Only the head's skull counts: a press anywhere else in the anchor goes to the page.
+- A poke plays a reaction: `oof` (squash + wince), `ah` (surprised hop back), `flinch` (recoils away from
+  the poke), `giggle` (laugh + shake) or `dizzy` (× eyes + wobble). Never the same one twice in a row, one
+  at a time with a short cooldown. `poke.reactions` replaces the pool (unknown names warn once, skipped).
+- It works idle, paused or mid-line: the face changes for a moment and lip-sync carries on under it. A poke
+  never stops a line: pause it yourself from `onPoke` if you want to. No sound ships: play your own there.
+- A drag pulls the head on a rubber band (toward `drag.maxPx`, 80 css px, never past), tilted toward the
+  pull; it springs back with a wobble. A fast release is a fling and plays `dizzy`. A touch that starts on
+  the head drags it instead of scrolling the page; anywhere else the page scrolls as usual. A head painted
+  into its own anchor is cut at the anchor's padded box, so its drag stops there; give a group a
+  `data-minimoji-surface` frame for more room.
+- `ref.current.react(name?)` plays one from code (with no name, one from the pool), interactive or not,
+  and answers what played (null for an unknown name). React 19 passes `ref` as a prop.
+- Events: `onPoke({ reaction })`, `onDragStart()`, `onDragEnd({ distance, flung })`.
+- The anchor becomes a button (`role="button"`, focusable, `label` as its name, default "Poke the
+  avatar"): Enter or Space pokes it. Under reduced motion nothing moves; the faces still change.
+- The vanilla bundle (`/sdk/minimoji-heads.js`) takes the same `interactive`, `onPoke`, `onDragStart` and
+  `onDragEnd` options on `mountHeadPerformance`, and its stage has `react(name?, id?)`.
+
 ## 6. Listening, presence and thinking
 
 ```tsx
