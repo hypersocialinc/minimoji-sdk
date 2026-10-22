@@ -176,27 +176,29 @@ From least to most:
 
 ### Say a line: one call
 
-A recorded line is its audio plus a **line** (`*.timeline.json`, the public
-format in `docs/speech-line-format.md`: mouth frames at 60 fps, captions,
-optional timed words, mood and gesture cues). `useLine()` plays it on a head,
-mouth on the recording's own clock, cues on the face, words in
-`<MinimojiCaptions>`. This is what the homepage's hellos run on.
+**Hand the head the audio.** `useLine().say({ audio, transcript })` makes
+the head lip-sync to it, emote and caption it, with no timeline and no
+lip-sync code in your app. The SDK fetches the clip, decodes it with Web
+Audio, builds the line with `buildLine` (the analyser the homepage's lines
+are made with) and caches it. `prepare(clip)` does that ahead of time, so the
+click starts the line at once.
 
 ```tsx
 'use client';
-import { useEffect, useRef, useState } from 'react';
-import { MinimojiStage, MinimojiHead, MinimojiCaptions, useLine, type SpeechLine } from '@minimoji/react';
+import { useEffect, useRef } from 'react';
+import { MinimojiStage, MinimojiHead, MinimojiCaptions, useLine, type SpeechClip } from '@minimoji/react';
+
+const HEY: SpeechClip = { audio: '/voice/dash-hey.mp3', transcript: 'Hey! I am D.A.S.H.', mood: 'happy' };
 
 export function DashSaysHey() {
   const anchor = useRef<HTMLButtonElement>(null);
-  const [hey, setHey] = useState<SpeechLine | null>(null);
-  const line = useLine();
-  // load the line ahead of the click: the click's play() must run inside the gesture
-  useEffect(() => { fetch('/lines/dash-hey.timeline.json').then(r => r.json()).then(setHey).catch(() => {}); }, []);
+  const line = useLine({ onEnd: (_g, reason, error) => { if (reason === 'failed') console.warn(error); } });
+  // build it ahead of the click, so the click's play() runs inside the gesture
+  useEffect(() => { line.prepare(HEY).catch(() => {}); }, []);
   return (
     <>
       <button ref={anchor} type="button" aria-label="Say hi to D.A.S.H." data-minimoji="loading"
-        onClick={() => hey && line.say(hey, { audio: '/lines/dash-hey.mp3' })}
+        onClick={() => line.say(HEY)}
         style={{ position: 'relative', width: 160, height: 160 }} />
       <MinimojiCaptions player={line} />
       <MinimojiStage>
@@ -208,6 +210,32 @@ export function DashSaysHey() {
 }
 ```
 
+- **The clip** is `{ audio, transcript?, words?, captions?, mood? }`.
+  `audio` can be a URL, a `Blob` (a TTS response), an `ArrayBuffer` or an
+  `AudioBuffer`. `words` (`[{ text, start, end }]` in seconds, from your TTS
+  provider's timestamps) give phrase captions and word cues, such as a nod on
+  "yes" or a laugh on "haha". A `transcript`, or a `captions` string, gives
+  one caption over the voiced part. With none of these there are no
+  captions. Clips are cached by URL (or by the `Blob` or buffer object)
+  together with their words, keeping the last 8. A URL that serves new audio
+  each time needs a fresh URL per clip, or pass the `Blob`.
+- **Not prepared?** `say` still works. The line starts once it has been built
+  (about 20 ms per second of audio on a laptop). `line.preparing` is true
+  until then, and the head stays as it is.
+- **A clip that fails** (it will not load, it is not audio, or it runs past
+  60 s) never throws and never hangs. The head stays still,
+  `onEnd(generation, 'failed', error)` reports it, and `line.error` holds the
+  error until the next `say`.
+- **A prebuilt line** is the fast path: a `*.timeline.json` (the public format
+  in `docs/speech-line-format.md`: mouth frames at 60 fps, captions,
+  optional timed words, mood and gesture cues), played with
+  `line.say(timeline, { audio: '/lines/dash-hey.mp3' })`. The homepage's
+  hellos run on this. Use it when you build lines ahead of time.
+- **No React?** The site serves `/sdk/minimoji-heads.js`
+  (`apps/web/public/sdk/`), a single ESM file with three bundled. It provides
+  `mountHeadPerformance` and `createVoicedPerformance`, whose
+  `select({ audio, transcript })` takes the same plain clip, plus
+  `createLineSession` (this hook without React) and `createClipCache`.
 - **`emotes={false}` on a talking head**, set once: the line's strong mood
   cues emote through `cue`, quiet ones (k under 0.35) only change
   `expression`, gestures play through `cue`. `expression` is null between
@@ -218,8 +246,9 @@ export function DashSaysHey() {
 - **The newest `say` wins** (a generation token): it cuts the line before
   it, and a late promise or event from the old one does nothing. `stop()`
   and unmounting end it.
-- **`audio`**: a URL (the hook makes and frees the element), your own
-  `HTMLAudioElement` (paused, never freed), or none (the silent clock).
+- **`audio`** (with a prebuilt line): a URL (the hook makes and frees the
+  element), your own `HTMLAudioElement` (paused, never freed), or none (the
+  silent clock).
 - **Captions**: phrases by default — at most four words, broken after
   punctuation, the word being said lit (`data-lit`) and staying lit through
   the pause after it; the first phrase shows before the voice starts and the
@@ -229,9 +258,9 @@ export function DashSaysHey() {
   slot (then an ellipsis). A screen reader hears the whole line once per
   line (the moving words are hidden from it). Style the box with
   `className` / `style`; it must survive 200% text.
-- **Making a line** from your own audio and timed words (a TTS provider's
-  timestamps, dictation): `buildLine({ pcm, sampleRate, words, mood })` from
-  `@minimoji/engine/line`, offline; `packages/engine/dev/line-from-words.mjs`
+- **Making a line ahead of time** from your own audio and timed words (a
+  TTS provider's timestamps, dictation): `buildLine({ pcm, sampleRate, words, mood })` from
+  `@minimoji/engine/line`, offline (what `say({ audio })` runs for you); `packages/engine/dev/line-from-words.mjs`
   converts ElevenLabs-style `{ text, startMs, durationMs }` words plus the
   clips. Never derive mouth shapes from letters. `mood` sets the opening
   face quietly (no emote burst at the start); audio tags in the words

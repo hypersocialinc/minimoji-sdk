@@ -403,12 +403,13 @@ func performanceSnapshot(at hostTime: TimeInterval) -> AvatarPerformanceSnapshot
 
 ### Say a line: one call (`MinimojiLinePlayer`)
 
-A recorded line is its audio plus a **line** (`SpeechLine`: the public
-format in `docs/speech-line-format.md`, the same JSON the website plays:
-mouth frames, captions, optional timed words, mood and gesture cues).
-`MinimojiLinePlayer` plays it on a head, and `MinimojiCaptions` shows its
-words. They arrive in Kit 9.44.0 (pin from it); iOS 18 / macOS 15 for the
-views.
+**Hand the player the audio.** `host.say(audioFile: url, transcript: …)`
+makes the head lip-sync to it, emote and caption it, with no line building
+and no lip-sync code in your app. The player builds the line on the device
+with `SpeechLine.build`, off the main actor (no upload), caches it per file
+and plays it. `MinimojiCaptions` shows its words. The line player arrived in
+Kit 9.44.0; plain audio comes in 9.46.0 (see
+RELEASE_NOTES.md for the tag). The views need iOS 18 / macOS 15.
 
 ```swift
 import SwiftUI
@@ -418,22 +419,36 @@ import MinimojiMetal
 @available(iOS 18, macOS 15, *)
 struct DashSaysHey: View {
   let head: HeadDocument
-  let line: SpeechLine                       // try SpeechLine(json: data), from your bundle or server
-  let audio: URL
+  let audio: URL                             // any file AVFoundation reads: m4a, mp3, wav, caf
   @StateObject private var host = MinimojiLinePlayer()   // made once: the view struct is rebuilt, the player is not
 
   var body: some View {
     VStack {
-      Button { host.say(line, audio: audio) } label: {
+      Button { host.say(audioFile: audio, transcript: "Hey! I am D.A.S.H.", mood: "happy") } label: {
         MinimojiMetalHeadView(document: head, linePlayer: host, framing: .face)
       }
       .accessibilityLabel("Replay")
       MinimojiCaptions(player: host)
     }
+    .task { _ = try? await host.prepare(audioFile: audio, transcript: "Hey! I am D.A.S.H.", mood: "happy") }   // the tap then starts at once
   }
 }
 ```
 
+- **Words, a transcript or neither:** `words:` as
+  `[SpeechLine.Word(text:start:end:)]` (your TTS provider's timestamps or
+  on-device dictation) give phrase captions and word cues, such as a nod on
+  "yes". `transcript:` gives one caption over the voiced part. Samples in
+  memory go through `say(pcm:sampleRate:…)` instead, which is not cached.
+- **Not prepared?** `say` still works. The line starts once it has been
+  built (a 10 s clip takes a fraction of a second). `preparing` is true until
+  then, and the head stays as it is.
+- **A clip that can't be built** (unreadable, empty, over 60 s) never plays
+  and never hangs. The say ends `.stopped`, and `lastFailure` (cleared by
+  the next say) and `onFailure` give the reason. `EndReason` still has only
+  `.ended` and `.stopped`.
+- **A prebuilt line** (`SpeechLine(json:)`, the same JSON the website plays)
+  is the fast path: `host.say(line, audio: url)`.
 - **The head view takes the player** (`linePlayer:`): the mouth on the
   audio's clock, the line's strong mood cues as emotes, quiet ones (k under
   0.35) as a face change only, gestures as cues. The view's own emotes are
@@ -444,7 +459,7 @@ struct DashSaysHey: View {
   captions still run and end. Audio errors are logged.
 - **The newest `say` wins** (a generation token): it cuts the line before
   it, and the old one's callbacks do nothing. `stop()` ends a line;
-  `await host.speak(line, audio:)` returns `.ended` or `.stopped`, and
+  `await host.speak(audioFile:…)` (or `speak(line, audio:)`) returns `.ended` or `.stopped`, and
   cancelling its task stops the line. Never stop on `onDisappear`, which
   can fire after the next screen's `onAppear` and cut off its line.
 - **Audio session `.ambient` by default**: it mixes, respects the silent
@@ -460,7 +475,7 @@ struct DashSaysHey: View {
   and a long line shrinks to fit, then truncates. VoiceOver announces each
   line once, and the moving words are hidden from it. They must survive
   large Dynamic Type (shrink a headline beside the head instead).
-- **Building a line on the device**, offline (a voice note, a status):
+- **Building a line yourself**, offline (to store or send it):
   `try SpeechLine.build(audioFile: url, words: words, mood: "happy")`
   (`MinimojiLive`), with `words` as `[SpeechLine.Word(text:start:end:)]`
   from your TTS provider's timestamps or on-device dictation. Without
