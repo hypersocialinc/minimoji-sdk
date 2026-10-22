@@ -94,7 +94,7 @@ export function Dash() {
 - Ids: `agent` (D.A.S.H.), its themes (`dashGold`, `dashNeon`, …), the
   aliens (`alien`, `alienMint`, …), `cat`, `kitty`, `rabbit`, `monkey`,
   `dog`, `penguin`, `ghost`. The service's `GET /capabilities` lists them
-  (`characters`), and `CHARACTERS` in `@minimoji/engine/characters`.
+  (`characters`), and `CHARACTERS` in `@minimoji/react/characters`.
 - A dealt one (`dashDealt`, `alienDealt`) takes a `seed`: the same seed is
   the same face. `{ id, pick }` fixes parts of a kit.
 - Play a character exactly like a person: expressions, cues, talking,
@@ -260,7 +260,7 @@ export function DashSaysHey() {
   `className` / `style`; it must survive 200% text.
 - **Making a line ahead of time** from your own audio and timed words (a
   TTS provider's timestamps, dictation): `buildLine({ pcm, sampleRate, words, mood })` from
-  `@minimoji/engine/line`, offline (what `say({ audio })` runs for you); `packages/engine/dev/line-from-words.mjs`
+  `@minimoji/react/line`, offline (what `say({ audio })` runs for you); `packages/engine/dev/line-from-words.mjs`
   converts ElevenLabs-style `{ text, startMs, durationMs }` words plus the
   clips. Never derive mouth shapes from letters. `mood` sets the opening
   face quietly (no emote burst at the start); audio tags in the words
@@ -346,8 +346,8 @@ export function DashSaysHey() {
   (semitones off the speaker's median: natural talk's brows), `blink` and
   `drop` (counters: bump to fire once), `beat` (the listening nod's clock).
 - **Live audio** (a call, no recording): the engine's
-  `createLiveVisemeTimeline` and `createSpeechVoice` (in `@minimoji/engine`,
-  not re-exported here yet) are the web twins of the Swift Kit's
+  `createLiveVisemeTimeline` and `createSpeechVoice` (not in this package
+  yet: ask Minimoji) are the web twins of the Swift Kit's
   `LiveVisemes` and `SpeechVoice`: PCM in, a viseme and a level out, eased
   into a mouth per head.
 
@@ -521,8 +521,8 @@ export function Friend({ avatar, online, typing, music }: { avatar: AvatarInput;
 ## 7. Bodies
 
 `@minimoji/react` draws heads only. The homepage's full-body tile is the
-engine's own stage (`mountStage` from `@minimoji/engine/stage`, with the
-site's own assets) and is not a public web API yet. For bodies in an app use
+engine's own stage, with the site's own assets, and is not a public web API
+yet. For bodies in an app use
 the Swift Kit's `MinimojiBody`, or ask Minimoji.
 
 ## 8. Many heads on a page
@@ -581,8 +581,9 @@ Without the CLI, mint keys at minimoji.com/developers/keys.
 - Never ship a secret key, or the `.convex.cloud` URL, to the browser.
 - Never store an avatar document as the user's identity: store the
   **avatar key** from `POST /avatars`.
-- Never import `@minimoji/engine` internals for what this package already
-  does; the engine's own modules are not a stable API.
+- Never reach for the engine itself: it ships bundled and minified inside
+  this package, and only `@minimoji/react` and its `/characters`, `/line`
+  and `/clip` subpaths are public.
 
 ## 11. Swift twin
 
