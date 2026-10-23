@@ -83,6 +83,10 @@ never writes a secret key. Read them with
 `Bundle.main.object(forInfoDictionaryKey:)`. Without the CLI, mint the key at
 minimoji.com/developers/keys.
 
+Signed in, `npx minimoji generate "red curls" --name kai` keeps the avatar in
+the account's library: `npx minimoji avatars` lists it on any machine, and
+`npx minimoji avatars get kai` prints its `avatarKey` for the app to show.
+
 - A **publishable key** (`mk_pub_…`, from minimoji.com/developers) lives in
   the app: it may bake heads, cut editor pieces, generate avatars and pick
   moods.

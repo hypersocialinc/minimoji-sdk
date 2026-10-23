@@ -21,6 +21,7 @@ async function service(extra = {}) {
     "POST /avatars/generate": () => ({ json: { doc: DOC, notes: "curls matched to ginger", usage: {} } }),
     "POST /avatars": () => ({ json: { avatarKey: KEY64, json: `${svc.url}/avatars/${KEY64}.json`, glb: `${svc.url}/avatars/${KEY64}.glb`, png: `${svc.url}/avatars/${KEY64}.png` } }),
     "GET /capabilities": () => ({ json: CAPS }),
+    "POST /cli/avatars": (c) => ({ json: { avatar: { name: c.body.name ?? c.body.defaultName, avatarKey: c.body.avatarKey, kind: "person", createdAt: 1, updatedAt: 1 }, outcome: "added" } }),
     [`GET /avatars/${KEY64}.json`]: () => ({ json: DOC }),
     ...extra,
   });
@@ -52,10 +53,12 @@ test("generate: mints the CLI's secret key once, generates, saves, and prints ke
     const ctx = await signedIn(svc);
     const r = await run(ctx, ["generate", "red", "curls", "--count", "2", "--seed", "5", "--out", "kai.json", "--open", "--base", svc.url, "--json"]);
     assert.equal(r.code, 0, r.stderr);
-    assert.deepEqual(svc.calls.map((c) => `${c.method} ${c.path}`), ["POST /cli/keys", "POST /avatars/generate", "POST /avatars", "POST /avatars/generate", "POST /avatars"]);
+    assert.deepEqual(svc.calls.map((c) => `${c.method} ${c.path}`), ["POST /cli/keys", "POST /avatars/generate", "POST /avatars", "POST /cli/avatars", "POST /avatars/generate", "POST /avatars", "POST /cli/avatars"]);
     assert.deepEqual(svc.calls[0].body, { kind: "secret", label: "minimoji CLI on test-host" });
     assert.deepEqual(svc.calls[1].body, { prompt: "red curls", seed: 5 });
-    assert.equal(svc.calls[3].body.seed, 6, "each of a count gets its own seed");
+    assert.equal(svc.calls[4].body.seed, 6, "each of a count gets its own seed");
+    assert.deepEqual(svc.calls[3].body, { avatarKey: KEY64, defaultName: "red-curls" }, "signed in, each one is kept in the library, named after the words");
+    assert.equal(svc.calls[3].auth, `Bearer mk_cli_${"c".repeat(40)}`, "the library takes the session, not the key");
     assert.equal(svc.calls[1].auth, `Bearer ${sec()}`);
     assert.deepEqual(svc.calls[2].body, { doc: DOC });
     const [a] = r.json.avatars;
@@ -94,7 +97,7 @@ test("a stored CLI key the service refuses is replaced once and the call retried
     await signIn(ctx, svc.url, { secretKey: { key: sec("9"), prefix: prefixOf(sec("9")) } });
     const r = await run(ctx, ["generate", "a fox", "--base", svc.url]);
     assert.equal(r.code, 0, r.stderr);
-    assert.deepEqual(svc.calls.map((c) => c.path), ["/avatars/generate", "/cli/keys", "/avatars/generate", "/avatars"]);
+    assert.deepEqual(svc.calls.map((c) => c.path), ["/avatars/generate", "/cli/keys", "/avatars/generate", "/avatars", "/cli/avatars"]);
     assert.equal(svc.calls[2].auth, `Bearer ${sec()}`);
   } finally { await svc.close(); }
 });

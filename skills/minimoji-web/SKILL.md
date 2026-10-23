@@ -612,6 +612,10 @@ npx minimoji init --with-skill   # mints a publishable key, writes .env.local, i
 secret key for your server: `npx minimoji keys create --kind secret`.
 Without the CLI, mint keys at minimoji.com/developers/keys.
 
+Signed in, `npx minimoji generate "red curls" --name kai` keeps the avatar in
+the account's library: `npx minimoji avatars` lists it on any machine, and
+`npx minimoji avatars get kai` prints its `avatarKey` for the app to show.
+
 ## 10. Never do
 
 - Never hand-draw or keyframe talking, blinking or emoting: feed speech

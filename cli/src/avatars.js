@@ -1,11 +1,14 @@
 // MAKING AVATARS — over routes that already exist (convex/http.ts): a
 // document from words or a photo (POST /avatars/generate) saved with POST
 // /avatars, a species saved the same way, the still from GET
-// /avatars/<key>.png, and the website's /preview page to look at one.
+// /avatars/<key>.png, and the website's /preview page to look at one. When
+// the terminal is signed in, what generate makes is kept in the library
+// (library.js), and render and preview take a library name for a key.
 import { readFile, writeFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
 import { BASES, CliError, call, keyedCall, resolveSite } from "./service.js";
 import { table } from "./auth.js";
+import { checkName, keep, keyFor, signedIn, slugify } from "./library.js";
 
 /** a run's ceiling: each generation is cents of model time from the key's day quota */
 export const MAX_COUNT = 10;
@@ -23,6 +26,9 @@ export async function generate(ctx, base, opts, out, words) {
   if (!prompt && !opts.photo) throw new CliError('generate needs a description ("red curls, round glasses"), --photo me.jpg, or both');
   if (prompt.length > MAX_PROMPT_CHARS) throw new CliError(`the description is at most ${MAX_PROMPT_CHARS} characters`);
   const seed = optionalInt(opts.seed, "--seed");
+  const name = opts.name == null ? null : checkName(opts.name);
+  const keeping = await signedIn(ctx, base);
+  if (name && !keeping) throw new CliError("--name keeps the avatar in your library, which needs a signed-in terminal: run minimoji login first");
   let image;
   if (opts.photo) {
     const bytes = await readFile(resolve(ctx.cwd, opts.photo)).catch((e) => { throw new CliError(`cannot read ${opts.photo} (${e.code})`); });
@@ -35,13 +41,22 @@ export async function generate(ctx, base, opts, out, words) {
   // quota, the network) must not lose the avatars already paid for
   const avatars = [];
   let failure = null;
+  const unkept = [];
   for (let i = 0; i < count; i++) {
     if (count > 1) ctx.stderr(`generating ${i + 1} of ${count}…\n`);
     try {
       const made = await keyedCall(ctx, base, opts, "POST", "/avatars/generate", { ...(prompt ? { prompt } : {}), ...(image ? { image } : {}), ...(seed != null ? { seed: seed + i } : {}) });
       const saved = await keyedCall(ctx, base, opts, "POST", "/avatars", { doc: made.doc });
       if (opts.out) await writeFile(numbered(resolve(ctx.cwd, opts.out), i, count), `${JSON.stringify(made.doc, null, 2)}\n`);
-      avatars.push({ ...described(ctx, base, opts, saved, made.doc), notes: made.notes ?? null, doc: made.doc });
+      let kept = null;
+      // the avatar is saved and paid for: a library that refuses it (full,
+      // the network) is said, not a reason to stop the run or lose the key
+      if (keeping) {
+        try {
+          kept = (await keep(ctx, base, { avatarKey: saved.avatarKey, ...(name ? { name, suffix: true } : { defaultName: slugify(prompt) ?? "avatar" }) })).avatar.name;
+        } catch (error) { const why = `saved ${saved.avatarKey} but could not add it to your library: ${error.message}`; unkept.push(why); ctx.stderr(`minimoji: ${why}\n`); }
+      }
+      avatars.push({ ...described(ctx, base, opts, saved, made.doc), name: kept, notes: made.notes ?? null, doc: made.doc });
     } catch (error) {
       if (!avatars.length) throw error;
       failure = `made ${avatars.length} of ${count}, then: ${error.message}`;
@@ -49,10 +64,10 @@ export async function generate(ctx, base, opts, out, words) {
     }
   }
   if (opts.open) for (const a of avatars) ctx.open(a.preview);
-  out({ avatars, ...(failure ? { error: failure } : {}) }, avatars.map((a) => [a.avatarKey, `  picture  ${a.picture}`, `  preview  ${a.preview}`, ...(a.notes ? [`  notes    ${oneLine(a.notes)}`] : [])].join("\n")).join("\n\n"));
-  if (!failure) return 0;
-  ctx.stderr(`minimoji: ${failure}\n`);
-  return 1;
+  out({ avatars, ...(failure ? { error: failure } : {}), ...(unkept.length ? { libraryErrors: unkept } : {}), ...(unkept.length && !failure ? { error: unkept.join("; ") } : {}) },
+    avatars.map((a) => [a.avatarKey, ...(a.name ? [`  name     ${a.name}`] : []), `  picture  ${a.picture}`, `  preview  ${a.preview}`, ...(a.notes ? [`  notes    ${oneLine(a.notes)}`] : [])].join("\n")).join("\n\n"));
+  if (failure) { ctx.stderr(`minimoji: ${failure}\n`); return 1; }
+  return unkept.length ? 1 : 0;
 }
 
 export async function species(ctx, base, opts, out, [sub, ...rest]) {
@@ -98,10 +113,11 @@ export function parsePicks(raw, kit, id) {
   return pick;
 }
 
-export async function render(ctx, base, opts, out, [key]) {
-  if (!key || !AVATAR_KEY.test(key)) throw new CliError("render needs an avatar key: the 64 hex characters generate or species make printed");
+export async function render(ctx, base, opts, out, [target]) {
+  if (!target) throw new CliError("render needs an avatar: a name from minimoji avatars, or the 64-hex key generate or species make printed");
   const size = opts.size == null ? 256 : Number(opts.size);
   if (!RENDER_SIZES.includes(size)) throw new CliError(`--size is one of ${RENDER_SIZES.join(", ")}`);
+  const key = await keyFor(ctx, base, target);
   const url = `${base}/avatars/${key}.png?size=${size}${opts.face ? `&face=${encodeURIComponent(opts.face)}` : ""}`;
   let res;
   try { res = await ctx.fetch(url, { redirect: "follow" }); } catch (error) { throw new CliError(`could not reach ${base} (${error?.cause?.code ?? error?.message})`); }
@@ -113,15 +129,17 @@ export async function render(ctx, base, opts, out, [key]) {
   }
   const bytes = Buffer.from(await res.arrayBuffer());
   if (!isPNG(bytes)) throw new CliError("the picture route answered with something that is not a PNG");
-  const file = resolve(ctx.cwd, opts.out ?? `${key.slice(0, 12)}-${size}.png`);
+  const file = resolve(ctx.cwd, opts.out ?? `${AVATAR_KEY.test(target) ? key.slice(0, 12) : target}-${size}.png`);
   await writeFile(file, bytes);
   return out({ file, bytes: bytes.length, url }, `Wrote ${file} (${bytes.length} bytes).`);
 }
 
 export async function preview(ctx, base, opts, out, [target]) {
-  if (!target) throw new CliError("preview needs an avatar key or a document's .json file");
+  if (!target) throw new CliError("preview needs an avatar (a name or a key) or a document's .json file");
   let source;
+  // a name has no dot or slash; a file nearly always has one
   if (AVATAR_KEY.test(target)) source = { avatarKey: target };
+  else if (!/[./\\]/.test(target)) source = { avatarKey: await keyFor(ctx, base, target) };
   else {
     let text;
     try { text = await readFile(resolve(ctx.cwd, target), "utf8"); } catch (e) { throw new CliError(`${target} is neither an avatar key nor a readable file (${e.code})`); }

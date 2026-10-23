@@ -8,6 +8,7 @@ import { parseArgs } from "node:util";
 import { keys, login, logout, whoami } from "./auth.js";
 import { generate, preview, render, species } from "./avatars.js";
 import { init } from "./init.js";
+import { avatars } from "./library.js";
 import { CliError, resolveBase } from "./service.js";
 import { skills } from "./skills.js";
 
@@ -36,17 +37,20 @@ const COMMANDS = {
   skills: { run: skills, options: { agent: { type: "string" }, ref: { type: "string" } },
     usage: "minimoji skills list | add [name…] | update [name…] [--agent claude|codex] [--ref <git ref>]",
     about: "Install the Minimoji agent skills into this project (.claude/skills or .agents/skills), so a coding agent knows the SDK." },
-  generate: { run: generate, options: { ...KEY, ...SITE, photo: { type: "string" }, count: { type: "string" }, seed: { type: "string" }, out: { type: "string" }, open: { type: "boolean" } },
-    usage: 'minimoji generate "red curls, round glasses" [--photo me.jpg] [--count n] [--seed n] [--out kai.json] [--open]',
-    about: `Make an avatar from words, a photo or both, and save it. Each one spends a generation from the key's day; --count is at most 10.` },
+  generate: { run: generate, options: { ...KEY, ...SITE, name: { type: "string" }, photo: { type: "string" }, count: { type: "string" }, seed: { type: "string" }, out: { type: "string" }, open: { type: "boolean" } },
+    usage: 'minimoji generate "red curls, round glasses" [--name kai] [--photo me.jpg] [--count n] [--seed n] [--out kai.json] [--open]',
+    about: `Make an avatar from words, a photo or both, save it, and keep it in your library (named --name, or after the words). Each one spends a generation from the key's day; --count is at most 10.` },
+  avatars: { run: avatars, options: { name: { type: "string" }, out: { type: "string" } },
+    usage: "minimoji avatars [list] | save <key> [--name kai] | get <name|key> [--out kai.json] | rename <name|key> <new> | remove <name|key>",
+    about: "Your library: the avatars you made or kept, on any terminal you sign in to. A name works wherever a key does." },
   species: { run: species, options: { ...KEY, ...SITE, seed: { type: "string" }, pick: { type: "string", multiple: true }, open: { type: "boolean" } },
     usage: "minimoji species list | make <id> [--seed n] [--pick axis=option …] [--open]",
     about: "The species the service offers, and saving one (an alien, D.A.S.H., an animal) with picks from its kit." },
   render: { run: render, options: { size: { type: "string" }, face: { type: "string" }, out: { type: "string" } },
-    usage: "minimoji render <avatarKey> [--size 64|128|256|512] [--face happy] [--out file.png]",
+    usage: "minimoji render <avatarKey | name> [--size 64|128|256|512] [--face happy] [--out file.png]",
     about: "Download a saved avatar's still picture." },
   preview: { run: preview, options: { ...SITE, face: { type: "string" }, body: { type: "boolean" }, "no-browser": { type: "boolean" } },
-    usage: "minimoji preview <avatarKey | doc.json> [--face happy] [--body] [--no-browser]",
+    usage: "minimoji preview <avatarKey | name | doc.json> [--face happy] [--body] [--no-browser]",
     about: "Open the avatar on minimoji.com/preview. A local document rides in the link's fragment and is never uploaded." },
 };
 

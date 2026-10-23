@@ -79,11 +79,11 @@ Set `GITHUB_TOKEN` if GitHub's anonymous rate limit gets in the way.
 
 | Command | What it does |
 | --- | --- |
-| `minimoji generate "red curls, round glasses" [--photo me.jpg]` | a person from words, a photo or both, saved; `--count n` (at most 10), `--seed n`, `--out kai.json`, `--open` |
+| `minimoji generate "red curls, round glasses" [--name kai] [--photo me.jpg]` | a person from words, a photo or both, saved and kept in your library; `--count n` (at most 10), `--seed n`, `--out kai.json`, `--open` |
 | `minimoji species list` | the species and their kits |
 | `minimoji species make <id> [--seed n] [--pick axis=option …]` | a species, saved; `--open` |
-| `minimoji render <avatarKey> [--size 256] [--face happy] [--out file.png]` | the still picture |
-| `minimoji preview <avatarKey \| doc.json> [--face happy] [--body]` | open it on minimoji.com/preview |
+| `minimoji render <avatarKey \| name> [--size 256] [--face happy] [--out file.png]` | the still picture |
+| `minimoji preview <avatarKey \| name \| doc.json> [--face happy] [--body]` | open it on minimoji.com/preview |
 
 Each prints the avatar key, its picture URL and its preview page. A
 generation costs model time and spends one of the key's generations for the
@@ -93,6 +93,26 @@ revokes it). `--key` or `MINIMOJI_KEY` uses a key of your own instead.
 
 `preview` of a local file puts the document in the link's fragment, which
 the browser never sends to a server.
+
+## Your avatar library
+
+Signed in, every avatar `generate` makes is kept in your account under a
+name: `--name kai`, or a slug of the words (`red-curls-round-glasses`), with
+`-2`, `-3`… when the name is taken. Sign in on another machine and the same
+library is there.
+
+| Command | What it does |
+| --- | --- |
+| `minimoji avatars` (or `avatars list`) | name, short key, kind (person or species), saved date; `--json` gives `{avatars: [{name, avatarKey, kind, createdAt}]}` |
+| `minimoji avatars save <key> [--name pal]` | keep any saved avatar, someone else's too; saving it again changes nothing unless `--name` renames it |
+| `minimoji avatars get <name \| key> [--out kai.json]` | the key and the document |
+| `minimoji avatars rename <name \| key> <new>` | a new name |
+| `minimoji avatars remove <name \| key>` | drop it from the library; the avatar stays saved and its key keeps working |
+
+A name is 1 to 40 lowercase letters, digits and dashes. Wherever a command
+takes an avatar, it reads an exact name first, then a full 64-hex key, then a
+key prefix of 8 or more characters that only one of your avatars starts
+with. A library holds 500 avatars.
 
 ## Every command
 
