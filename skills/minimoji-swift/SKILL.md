@@ -601,6 +601,33 @@ let saved = try await yourBackend.saveAvatar(doc)           // response includes
 The response's `avatarKey` is what you store; `renderURL(for:size:)` and
 `head(forKey:)` take it.
 
+### Use my Minimoji: a person's own avatar
+
+A person with a Minimoji account (minimoji.com/me) can bring their avatar
+to your app. You never send an email: they pick one on minimoji.com (an
+`ASWebAuthenticationSession`, so an existing minimoji.com sign-in is one tap)
+and your app gets that pick. The host's three lines:
+
+```swift
+import MinimojiService
+
+// 1. show the button (iOS 18; `service.connect(from: window)` is the same flow on 17)
+MinimojiConnectButton(service: service) { connected in
+  user.minimoji = connected              // 2. store { grantId, avatarKey } against your user
+}
+// 3. on launch, follow their edits and re-picks; nil means they disconnected your app
+user.minimoji = try await service.refresh(user.minimoji!.grantId)
+```
+
+- One live grant per app and person: connecting again (another device, or the person reconnecting) replaces the grant, and the old id answers 410 (`refresh` returns nil). Re-read the grant you stored before clearing it; another device may have saved a new one.
+- `service.key` is your app's publishable key; its label (set at
+  minimoji.com/developers/keys) is the app name the person sees.
+- Show the head with `head(forKey: connected.avatarKey)` or
+  `renderURL(for:size:)`.
+- An avatar your server saved with `POST /avatars`:
+  `service.addToLibrary(grantId, avatarKey:)` puts it in their library and
+  picks it for your app (`.service` with a 403's words if they said no).
+
 ## 10. Gotchas
 
 - **Never put `current` or locks on a photo request.** A selfie is always a

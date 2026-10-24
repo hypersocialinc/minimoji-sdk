@@ -616,6 +616,37 @@ Signed in, `npx minimoji generate "red curls" --name kai` keeps the avatar in
 the account's library: `npx minimoji avatars` lists it on any machine, and
 `npx minimoji avatars get kai` prints its `avatarKey` for the app to show.
 
+### Use my Minimoji: a person's own avatar
+
+A person with a Minimoji account (minimoji.com/me) can bring their avatar
+to your app. You never ask for their email: they pick one on minimoji.com
+and your app gets that pick. The host's three lines:
+
+```jsx
+import { MinimojiConnectButton, refreshMinimojiGrant } from '@minimoji/react';
+
+// 1. show the button; the popup opens on the click
+<MinimojiConnectButton minimojiKey={process.env.NEXT_PUBLIC_MINIMOJI_KEY} service={process.env.NEXT_PUBLIC_MINIMOJI_SERVICE_URL}
+  onConnected={({ grantId, avatarKey }) => saveForUser({ grantId, avatarKey })} />   // 2. store both against your user
+// 3. on launch, follow their edits and re-picks; null means they disconnected your app
+const now = await refreshMinimojiGrant({ service, key, grantId });   // { grantId, avatarKey } | null
+```
+
+- One live grant per app and person: connecting again (another device, or the person reconnecting) replaces the grant, and the old id answers 410. On a 410, re-read the grant you stored before clearing it; another device may have saved a new one.
+- Refresh on the device at launch, not from your server for every user: the grant routes are limited per key and caller address.
+- The key is your app's publishable key; its label (set at
+  minimoji.com/developers/keys) is the app name the person sees, so name it
+  after the app.
+- `useMinimojiConnect({ key, service })` gives `{ connect, connecting, error }`
+  for your own button. `connect()` resolves null on "Not now", on expiry, or
+  when the popup is closed without an answer.
+- Show the head with `<MinimojiHeadPoster src={`${service}/avatars/${avatarKey}.png?size=256`} />`
+  and fetch `${service}/avatars/${avatarKey}.json` to draw it live.
+- An avatar made in your own editor, which your server saves with
+  `POST /avatars`: `addToMinimojiLibrary({ service, key, grantId, avatarKey })`
+  puts it in their library and picks it for your app (a 403 if they said no
+  to that on the sheet).
+
 ## 10. Never do
 
 - Never hand-draw or keyframe talking, blinking or emoting: feed speech
