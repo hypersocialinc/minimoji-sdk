@@ -278,7 +278,6 @@ With the built-in selfie camera and AI edit:
 ```swift
 MinimojiEditorView(service: service, doc: $doc, head: $head,
                    imports: .kit(camera: true),
-                   shuffleHeads: shuffle,                 // optional: [HeadDocument], the heads the shuffle turns through
                    proposalOpen: $stageBusy)              // true while the camera, the read or a new face owns the stage
 ```
 
@@ -289,8 +288,9 @@ MinimojiEditorView(service: service, doc: $doc, head: $head,
   `NSSpeechRecognitionUsageDescription`; the mic hides without them.
 - **Hide your own Cancel/Save while `proposalOpen` is true.** The Kit's Keep,
   Undo, Retake and ✕ are the only exits then.
-- `shuffleHeads:` is optional (`[HeadDocument]`); without it the device
-  builds three starters when a builder is attached.
+- The editor fills the space you give it (the stage takes what the parts
+  panel doesn't use; the camera takes all of it), so put it in a sheet or a
+  screen with no fixed height. `shuffleHeads:` is deprecated and ignored.
 - A "replace my avatar" screen starts fresh:
 
 ```swift
