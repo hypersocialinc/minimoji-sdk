@@ -41,6 +41,11 @@ export async function keep(ctx, base, body) {
   return sessionCall(ctx, base, "POST", "/cli/avatars", body);
 }
 
+/** point the entry `{name}` or `{avatarKey}` at the saved avatar `to`, keeping its name */
+export async function repoint(ctx, base, body) {
+  return sessionCall(ctx, base, "POST", "/cli/avatars/repoint", body);
+}
+
 /** a name, a full key or a unique key prefix (8+) to the entry it means, in
  *  that order. A full key not in the library comes back as `{avatarKey}`
  *  alone when `anyKey`; anything else unresolved is an error naming close names */

@@ -8,7 +8,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
 import { BASES, CliError, call, keyedCall, resolveSite } from "./service.js";
 import { table } from "./auth.js";
-import { checkName, keep, keyFor, signedIn, slugify } from "./library.js";
+import { checkName, keep, keyFor, listLibrary, repoint, resolveTarget, signedIn, slugify } from "./library.js";
 
 /** a run's ceiling: each generation is cents of model time from the key's day quota */
 export const MAX_COUNT = 10;
@@ -29,13 +29,7 @@ export async function generate(ctx, base, opts, out, words) {
   const name = opts.name == null ? null : checkName(opts.name);
   const keeping = await signedIn(ctx, base);
   if (name && !keeping) throw new CliError("--name keeps the avatar in your library, which needs a signed-in terminal: run minimoji login first");
-  let image;
-  if (opts.photo) {
-    const bytes = await readFile(resolve(ctx.cwd, opts.photo)).catch((e) => { throw new CliError(`cannot read ${opts.photo} (${e.code})`); });
-    if (bytes.length > MAX_PHOTO_BYTES) throw new CliError(`${opts.photo} is over ${MAX_PHOTO_BYTES / 1024 / 1024} MB; downscale it to a 1024 px long edge first`);
-    if (!isJPEG(bytes) && !isPNG(bytes)) throw new CliError(`${opts.photo} must be a JPEG or a PNG`);
-    image = bytes.toString("base64");
-  }
+  const image = await readPhoto(ctx, opts.photo);
 
   // each one is written as it is made: a failure later in a run (the day's
   // quota, the network) must not lose the avatars already paid for
@@ -68,6 +62,69 @@ export async function generate(ctx, base, opts, out, words) {
     avatars.map((a) => [a.avatarKey, ...(a.name ? [`  name     ${a.name}`] : []), `  picture  ${a.picture}`, `  preview  ${a.preview}`, ...(a.notes ? [`  notes    ${oneLine(a.notes)}`] : [])].join("\n")).join("\n\n"));
   if (failure) { ctx.stderr(`minimoji: ${failure}\n`); return 1; }
   return unkept.length ? 1 : 0;
+}
+
+/** a photo for /avatars/generate as base64, checked before anything is
+ *  spent; undefined without --photo */
+async function readPhoto(ctx, photo) {
+  if (!photo) return undefined;
+  const bytes = await readFile(resolve(ctx.cwd, photo)).catch((e) => { throw new CliError(`cannot read ${photo} (${e.code})`); });
+  if (bytes.length > MAX_PHOTO_BYTES) throw new CliError(`${photo} is over ${MAX_PHOTO_BYTES / 1024 / 1024} MB; downscale it to a 1024 px long edge first`);
+  if (!isJPEG(bytes) && !isPNG(bytes)) throw new CliError(`${photo} must be a JPEG or a PNG`);
+  return bytes.toString("base64");
+}
+
+/** change a saved avatar: its document goes to /avatars/generate as
+ *  `current` beside the words or photo, the result is saved, and the library
+ *  entry moves to the new key under the same name (or, with --as, the result
+ *  is a new entry and the old one is left alone; a key not in the library is
+ *  added under the words' name). Signed out it takes a key and keeps
+ *  nothing, as generate does */
+export async function edit(ctx, base, opts, out, [target, ...words]) {
+  if (!target) throw new CliError('edit needs an avatar (a name or a key) and what to change: minimoji edit kai "make the hair blue"');
+  const prompt = words.join(" ").trim();
+  if (!prompt && !opts.photo) throw new CliError('edit needs what to change ("make the hair blue"), --photo me.jpg, or both');
+  if (prompt.length > MAX_PROMPT_CHARS) throw new CliError(`the description is at most ${MAX_PROMPT_CHARS} characters`);
+  const as = opts.as == null ? null : checkName(opts.as, "--as");
+  const keeping = await signedIn(ctx, base);
+  if (!keeping && !AVATAR_KEY.test(target)) throw new CliError(`${target} is a library name, which needs a signed-in terminal: run minimoji login, or pass the avatar's 64-hex key`);
+  if (!keeping && as) throw new CliError("--as keeps the edit in your library, which needs a signed-in terminal: run minimoji login first");
+  const image = await readPhoto(ctx, opts.photo);
+  const entries = keeping ? await listLibrary(ctx, base) : [];
+  const entry = keeping ? resolveTarget(target, entries, { anyKey: true }) : { avatarKey: target, name: null };
+  // a taken --as is refused here, before a generation is spent on it
+  if (as && entries.some((e) => e.name === as)) throw new CliError(`you already have an avatar named ${as}; pick another --as`);
+  const current = (await call(ctx, base, "GET", `/avatars/${entry.avatarKey}.json`)).data;
+
+  const made = await keyedCall(ctx, base, opts, "POST", "/avatars/generate", { current, ...(prompt ? { prompt } : {}), ...(image ? { image } : {}) });
+  const saved = await keyedCall(ctx, base, opts, "POST", "/avatars", { doc: made.doc });
+  // the edit is saved and paid for: a library that refuses it is said, with the key, not lost
+  let name = null, libraryError = null;
+  // an edit that changed nothing has the same key: the entry already shows
+  // it, and keeping it --as would rename that entry rather than add one
+  const unchanged = saved.avatarKey === entry.avatarKey;
+  if (unchanged) { name = entry.name; ctx.stderr(`minimoji: the edit came back unchanged${keeping ? "; nothing in your library moved" : ""}\n`); }
+  else if (keeping) {
+    try {
+      // saving a key already kept with a name renames that entry: --as adds, never renames
+      const holder = as && entries.find((e) => e.avatarKey === saved.avatarKey);
+      if (holder) throw new CliError(`it is already in your library as ${holder.name}`);
+      if (as) name = (await keep(ctx, base, { avatarKey: saved.avatarKey, name: as })).avatar.name;
+      else if (entry.name) name = (await repoint(ctx, base, { avatarKey: entry.avatarKey, to: saved.avatarKey })).avatar.name;
+      else name = (await keep(ctx, base, { avatarKey: saved.avatarKey, defaultName: slugify(prompt) ?? "avatar" })).avatar.name;
+    } catch (error) { libraryError = `saved ${saved.avatarKey} but could not ${entry.name && !as ? `move ${entry.name} to it` : "add it to your library"}: ${error.message}`; }
+  }
+  const avatar = { name, avatarKey: saved.avatarKey, previousKey: entry.avatarKey, notes: made.notes ?? null, ...described(ctx, base, opts, saved, made.doc) };
+  if (opts.open) ctx.open(avatar.preview);
+  out({ ...avatar, ...(unchanged ? { unchanged: true } : {}), ...(libraryError ? { error: libraryError } : {}) }, [
+    avatar.avatarKey,
+    ...(name ? [`  name     ${name}${as && entry.name && !unchanged ? ` (${entry.name} is unchanged)` : ""}`] : []),
+    `  was      ${avatar.previousKey}`,
+    `  picture  ${avatar.picture}`, `  preview  ${avatar.preview}`,
+    ...(avatar.notes ? [`  notes    ${oneLine(avatar.notes)}`] : []),
+  ].join("\n"));
+  if (libraryError) { ctx.stderr(`minimoji: ${libraryError}\n`); return 1; }
+  return 0;
 }
 
 export async function species(ctx, base, opts, out, [sub, ...rest]) {

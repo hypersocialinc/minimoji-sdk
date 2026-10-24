@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { keys, login, logout, whoami } from "./auth.js";
-import { generate, preview, render, species } from "./avatars.js";
+import { edit, generate, preview, render, species } from "./avatars.js";
 import { init } from "./init.js";
 import { avatars } from "./library.js";
 import { CliError, resolveBase } from "./service.js";
@@ -40,6 +40,9 @@ const COMMANDS = {
   generate: { run: generate, options: { ...KEY, ...SITE, name: { type: "string" }, photo: { type: "string" }, count: { type: "string" }, seed: { type: "string" }, out: { type: "string" }, open: { type: "boolean" } },
     usage: 'minimoji generate "red curls, round glasses" [--name kai] [--photo me.jpg] [--count n] [--seed n] [--out kai.json] [--open]',
     about: `Make an avatar from words, a photo or both, save it, and keep it in your library (named --name, or after the words). Each one spends a generation from the key's day; --count is at most 10.` },
+  edit: { run: edit, options: { ...KEY, ...SITE, as: { type: "string" }, photo: { type: "string" }, open: { type: "boolean" } },
+    usage: 'minimoji edit <name|key> ["make the hair blue"] [--photo me.jpg] [--as new-name] [--open]',
+    about: "Change an avatar with words, a photo or both. The name follows the edit (kai is now the new one); --as keeps it as a new entry instead. Spends a generation from the key's day." },
   avatars: { run: avatars, options: { name: { type: "string" }, out: { type: "string" } },
     usage: "minimoji avatars [list] | save <key> [--name kai] | get <name|key> [--out kai.json] | rename <name|key> <new> | remove <name|key>",
     about: "Your library: the avatars you made or kept, on any terminal you sign in to. A name works wherever a key does." },

@@ -615,6 +615,11 @@ Without the CLI, mint keys at minimoji.com/developers/keys.
 Signed in, `npx minimoji generate "red curls" --name kai` keeps the avatar in
 the account's library: `npx minimoji avatars` lists it on any machine, and
 `npx minimoji avatars get kai` prints its `avatarKey` for the app to show.
+`npx minimoji edit kai "make the hair blue"` (or `--photo me.jpg`) changes
+it: the name follows the edit to a new `avatarKey` (the first line it
+prints; `--json` gives `avatarKey` and `previousKey`), and `--as kai-blue`
+keeps the edit as a new entry instead.
+An app showing a hard-coded key keeps the old look until you update the key.
 
 ### Use my Minimoji: a person's own avatar
 

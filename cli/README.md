@@ -109,6 +109,26 @@ library is there.
 | `minimoji avatars rename <name \| key> <new>` | a new name |
 | `minimoji avatars remove <name \| key>` | drop it from the library; the avatar stays saved and its key keeps working |
 
+### Changing one
+
+```sh
+minimoji edit kai "make the hair blue"     # kai is now the blue-haired one
+minimoji edit kai --photo me.jpg           # change it toward a photo
+minimoji edit kai "add glasses" --as kai-glasses   # keep it as a new entry; kai stays as it was
+```
+
+`edit <name | key> ["words"] [--photo me.jpg] [--as new-name]` sends the
+avatar's document with the words, the photo or both to the service, which
+changes that avatar rather than starting over. The result is saved under a
+new key, and the name follows it: `render kai` and `preview kai` show the
+edit, and apps connected to kai through minimoji.com/connect see it too. The
+old key keeps working and is printed in full (`was`; `previousKey` in
+`--json`, beside `name`, `avatarKey`, `notes`, `picture` and `preview`):
+`minimoji avatars save <old key> --name kai-before` keeps the old look as an
+entry of its own. An edit spends one generation from the key's day, like
+`generate`. A species can't be edited this way (`species make` picks its
+look). Signed out, `edit` takes a key, prints the new one and keeps nothing.
+
 A name is 1 to 40 lowercase letters, digits and dashes. Wherever a command
 takes an avatar, it reads an exact name first, then a full 64-hex key, then a
 key prefix of 8 or more characters that only one of your avatars starts

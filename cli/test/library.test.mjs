@@ -6,7 +6,10 @@ import { closeNames, resolveTarget, slugify } from "../src/library.js";
 import { fixtureServer, makeCtx, prefixOf, run, sec, signIn } from "./helpers.mjs";
 
 const DOC = { v: 2, seed: 7, hair: { style: "curly", color: "ginger" } };
+const BLUE = { v: 2, seed: 7, hair: { style: "curly", color: "blue" } };
 const MINE = "a".repeat(64);
+const EDITED = "e".repeat(64);
+const ALIEN = "d".repeat(64);
 const THEIRS = "b".repeat(56) + "12345678";
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
 const NAME = /^[a-z0-9][a-z0-9-]{0,39}$/;
@@ -14,7 +17,7 @@ const NAME = /^[a-z0-9][a-z0-9-]{0,39}$/;
 /** a service with a working library: the entries live in `svc.library`, by name */
 async function service(extra = {}) {
   const library = new Map();
-  const saved = new Set([MINE, THEIRS]);
+  const saved = new Set([MINE, THEIRS, ALIEN]);
   const find = (b) => [...library.values()].find((e) => (b.name != null ? e.name === b.name : e.avatarKey === b.avatarKey));
   const free = (name, suffix, self) => {
     for (let n = 1; ; n++) {
@@ -26,11 +29,19 @@ async function service(extra = {}) {
   };
   const svc = await fixtureServer({
     "POST /cli/keys": () => ({ json: { key: sec(), prefix: prefixOf(sec()), kind: "secret" } }),
-    "POST /avatars/generate": () => ({ json: { doc: DOC, notes: null, usage: {} } }),
-    "POST /avatars": () => ({ json: { avatarKey: MINE, json: `${svc.url}/avatars/${MINE}.json`, glb: `${svc.url}/avatars/${MINE}.glb`, png: `${svc.url}/avatars/${MINE}.png` } }),
+    // as the route does: a species as `current` is refused before anything is spent
+    "POST /avatars/generate": ({ body }) => body.current?.character
+      ? { status: 400, json: { error: "/avatars/generate works on a person's document; species have no generation" } }
+      : { json: { doc: body.current ? BLUE : DOC, notes: body.current ? "hair: ginger → blue" : null, usage: {} } },
+    "POST /avatars": ({ body }) => {
+      const key = body.doc?.hair?.color === "blue" ? EDITED : MINE;
+      saved.add(key);
+      return { json: { avatarKey: key, json: `${svc.url}/avatars/${key}.json`, glb: `${svc.url}/avatars/${key}.glb`, png: `${svc.url}/avatars/${key}.png` } };
+    },
     "GET /avatars/*": (c) => {
       const key = c.path.slice("/avatars/".length, -".json".length);
-      if (c.path.endsWith(".json") && saved.has(key)) return { json: DOC };
+      if (c.path.endsWith(".json") && key === ALIEN) return { json: { character: { id: "alienGrey", seed: 3 } } };
+      if (c.path.endsWith(".json") && saved.has(key)) return { json: key === EDITED ? BLUE : DOC };
       if (c.path.endsWith(".png")) return { body: PNG, headers: { "Content-Type": "image/png" } };
       return { status: 404, json: { error: `no avatar with key ${key}` } };
     },
@@ -54,6 +65,17 @@ async function service(extra = {}) {
       library.delete(from);
       entry.name = body.to;
       library.set(body.to, entry);
+      return { json: { avatar: entry, from } };
+    },
+    // convex/lib/library.ts repointEntry: the same entry, a new key, a 409 when another name holds it
+    "POST /cli/avatars/repoint": ({ body }) => {
+      const entry = find(body);
+      if (!entry) return { status: 404, json: { error: "not in your library" } };
+      if (!saved.has(body.to)) return { status: 404, json: { error: `no avatar with key ${body.to}; save it first` } };
+      const holder = find({ avatarKey: body.to });
+      if (holder && holder !== entry) return { status: 409, json: { error: `you already have this exact avatar as ${holder.name}` } };
+      const from = entry.avatarKey;
+      Object.assign(entry, { avatarKey: body.to, updatedAt: 3 });
       return { json: { avatar: entry, from } };
     },
     "POST /cli/avatars/remove": ({ body }) => {
@@ -224,4 +246,152 @@ test("resolving: a name first, then a full key, then a unique prefix of 8 or mor
   assert.deepEqual(closeNames("kia", ["kai", "kaito", "pal"]), ["kai"]);
   assert.deepEqual(closeNames("ka", ["kai", "kaito", "pal"]), ["kai", "kaito"], "a part of a name is close");
   assert.equal(slugify("Red curls, round glasses!"), "red-curls-round-glasses");
+});
+
+const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10]);
+
+test("edit kai: current plus the words to /avatars/generate, and kai moves to the new key with its name and date", async () => {
+  const svc = await service();
+  try {
+    const ctx = await signedIn(svc);
+    await run(ctx, ["avatars", "save", MINE, "--name", "kai", "--base", svc.url]);
+    let r = await run(ctx, ["edit", "kai", "make the hair blue", "--base", svc.url, "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.deepEqual(svc.calls.find((c) => c.path === "/avatars/generate").body, { current: DOC, prompt: "make the hair blue" });
+    assert.deepEqual(svc.calls.find((c) => c.path === "/cli/avatars/repoint").body, { avatarKey: MINE, to: EDITED });
+    assert.deepEqual({ name: r.json.name, avatarKey: r.json.avatarKey, previousKey: r.json.previousKey, notes: r.json.notes },
+      { name: "kai", avatarKey: EDITED, previousKey: MINE, notes: "hair: ginger → blue" });
+    r = await run(ctx, ["avatars", "--base", svc.url]);
+    assert.match(r.stdout, /^NAME\s+KEY\s+KIND\s+SAVED\nkai\s+eeeeeeeeeeee\s+person\s+2026-10-23\n$/, "the same name and saved date, the new key");
+    r = await run(ctx, ["avatars", "get", MINE, "--base", svc.url, "--json"]);
+    assert.deepEqual(r.json.doc, DOC, "the old key still serves .json");
+    r = await run(ctx, ["edit", "kai", "make the hair blue", "--base", svc.url]);
+    assert.match(r.stdout, /^e{64}\n  name     kai\n  was      e{64}\n/, "full keys, so the old one can be saved again");
+    assert.match(r.stderr, /came back unchanged/);
+    const same = await run(ctx, ["edit", "kai", "make the hair blue", "--base", svc.url, "--json"]);
+    assert.equal(same.json.unchanged, true);
+    const before = svc.calls.length;
+    const taken = await run(ctx, ["edit", "kai", "make the hair blue", "--as", "kai", "--base", svc.url]);
+    assert.equal(taken.code, 1);
+    assert.match(taken.stderr, /already have an avatar named kai; pick another --as/);
+    assert.ok(!svc.calls.slice(before).some((c) => c.path === "/avatars/generate"), "a taken --as spends nothing");
+    assert.match(r.stderr, /came back unchanged/);
+  } finally { await svc.close(); }
+});
+
+test("edit --photo sends current plus the image; over 4 MB is refused before any request", async () => {
+  const svc = await service();
+  try {
+    const ctx = await signedIn(svc);
+    await run(ctx, ["avatars", "save", MINE, "--name", "kai", "--base", svc.url]);
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(join(ctx.cwd, "me.jpg"), JPEG);
+    await writeFile(join(ctx.cwd, "big.jpg"), Buffer.concat([JPEG, Buffer.alloc(4 * 1024 * 1024)]));
+    const before = svc.calls.length;
+    let r = await run(ctx, ["edit", "kai", "--photo", "big.jpg", "--base", svc.url]);
+    assert.equal(r.code, 1);
+    assert.match(r.stderr, /big\.jpg is over 4 MB/);
+    assert.equal(svc.calls.length, before, "no request at all");
+    r = await run(ctx, ["edit", "kai", "--photo", "me.jpg", "--base", svc.url, "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.deepEqual(svc.calls.find((c) => c.path === "/avatars/generate").body, { current: DOC, image: JPEG.toString("base64") });
+    assert.equal(svc.library.get("kai").avatarKey, EDITED);
+  } finally { await svc.close(); }
+});
+
+test("edit --as kai-blue adds a new entry and leaves kai on its old key", async () => {
+  const svc = await service();
+  try {
+    const ctx = await signedIn(svc);
+    await run(ctx, ["avatars", "save", MINE, "--name", "kai", "--base", svc.url]);
+    const r = await run(ctx, ["edit", "kai", "make the hair blue", "--as", "kai-blue", "--base", svc.url]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.match(r.stdout, /name {5}kai-blue \(kai is unchanged\)/);
+    assert.deepEqual([...svc.library.values()].map((e) => [e.name, e.avatarKey]).sort(), [["kai", MINE], ["kai-blue", EDITED]]);
+    assert.ok(!svc.calls.some((c) => c.path === "/cli/avatars/repoint"));
+  } finally { await svc.close(); }
+});
+
+test("edit of a species fails with the server's one line and keeps nothing", async () => {
+  const svc = await service();
+  try {
+    const ctx = await signedIn(svc);
+    await run(ctx, ["avatars", "save", ALIEN, "--name", "grey", "--base", svc.url]);
+    const r = await run(ctx, ["edit", "grey", "make it blue", "--base", svc.url]);
+    assert.equal(r.code, 1);
+    assert.match(r.stderr, /^minimoji: POST \/avatars\/generate failed \(400\): \/avatars\/generate works on a person's document; species have no generation\n$/m);
+    assert.ok(!svc.calls.some((c) => c.method === "POST" && (c.path === "/avatars" || c.path === "/cli/avatars/repoint")), "nothing saved, nothing moved");
+    assert.equal(svc.library.get("grey").avatarKey, ALIEN);
+  } finally { await svc.close(); }
+});
+
+test("edit with neither words nor --photo, or a bad --as, is a usage error and no request", async () => {
+  const svc = await service();
+  try {
+    const ctx = await signedIn(svc);
+    for (const [argv, why] of [[["edit", "kai"], /edit needs what to change/], [["edit"], /edit needs an avatar/], [["edit", "kai", "blue", "--as", "Kai Blue"], /--as "Kai Blue" is not a name/]]) {
+      const r = await run(ctx, [...argv, "--base", svc.url]);
+      assert.equal(r.code, 1, argv.join(" "));
+      assert.match(r.stderr, why);
+    }
+    assert.deepEqual(svc.calls, []);
+  } finally { await svc.close(); }
+});
+
+test("edit signed out: a key works and keeps nothing; a name or --as needs a session", async () => {
+  const svc = await service();
+  try {
+    const ctx = await makeCtx({ env: { MINIMOJI_KEY: sec("4") } });
+    let r = await run(ctx, ["edit", MINE, "make the hair blue", "--base", svc.url, "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.equal(r.json.name, null);
+    assert.equal(r.json.avatarKey, EDITED);
+    assert.ok(!svc.calls.some((c) => c.path.startsWith("/cli/")));
+    const before = svc.calls.length;
+    for (const argv of [["edit", "kai", "blue"], ["edit", MINE, "blue", "--as", "kai-blue"]]) {
+      r = await run(ctx, [...argv, "--base", svc.url]);
+      assert.equal(r.code, 1);
+      assert.match(r.stderr, /signed-in terminal/);
+    }
+    assert.equal(svc.calls.length, before, "no generation spent");
+  } finally { await svc.close(); }
+});
+
+test("edit by a key not in the library adds the result under the words' name", async () => {
+  const svc = await service();
+  try {
+    const ctx = await signedIn(svc);
+    const r = await run(ctx, ["edit", MINE, "make the hair blue", "--base", svc.url, "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.equal(r.json.name, "make-the-hair-blue");
+    assert.deepEqual(svc.calls.find((c) => c.method === "POST" && c.path === "/cli/avatars").body, { avatarKey: EDITED, defaultName: "make-the-hair-blue" });
+  } finally { await svc.close(); }
+});
+
+test("edit: a library that refuses the move prints the new key, says why, and exits 1", async () => {
+  const svc = await service();
+  try {
+    const ctx = await signedIn(svc);
+    await run(ctx, ["avatars", "save", MINE, "--name", "kai", "--base", svc.url]);
+    svc.library.set("blue", { name: "blue", avatarKey: EDITED, kind: "person", createdAt: 1, updatedAt: 1 });
+    const r = await run(ctx, ["edit", "kai", "make the hair blue", "--base", svc.url, "--json"]);
+    assert.equal(r.code, 1);
+    assert.equal(r.json.avatarKey, EDITED);
+    assert.match(r.json.error, /saved e{64} but could not move kai to it: .*already have this exact avatar as blue/);
+    assert.equal(svc.library.get("kai").avatarKey, MINE, "kai stays where it was");
+  } finally { await svc.close(); }
+});
+
+test("edit --as onto a key already kept under another name renames nothing and exits 1", async () => {
+  const svc = await service();
+  try {
+    const ctx = await signedIn(svc);
+    await run(ctx, ["avatars", "save", MINE, "--name", "kai", "--base", svc.url]);
+    svc.library.set("bob", { name: "bob", avatarKey: EDITED, kind: "person", createdAt: 1, updatedAt: 1 });
+    const r = await run(ctx, ["edit", "kai", "make the hair blue", "--as", "kai-blue", "--base", svc.url, "--json"]);
+    assert.equal(r.code, 1);
+    assert.match(r.json.error, /could not add it to your library: it is already in your library as bob/);
+    assert.deepEqual([...svc.library.keys()].sort(), ["bob", "kai"], "bob keeps its name");
+    assert.ok(!svc.calls.some((c) => c.method === "POST" && c.path === "/cli/avatars" && c.body.name === "kai-blue"));
+  } finally { await svc.close(); }
 });
