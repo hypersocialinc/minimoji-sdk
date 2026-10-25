@@ -16,7 +16,7 @@ export async function fixtureServer(routes) {
     for await (const c of req) chunks.push(c);
     const text = Buffer.concat(chunks).toString("utf8");
     const url = new URL(req.url, "http://fixture");
-    const call = { method: req.method, path: url.pathname, search: url.search, auth: req.headers.authorization ?? null, body: text ? safeJSON(text) : null };
+    const call = { method: req.method, path: url.pathname, search: url.search, auth: req.headers.authorization ?? null, headers: req.headers, raw: text, body: text ? safeJSON(text) : null };
     calls.push(call);
     const key = `${req.method} ${url.pathname}`;
     let route = routes[key] ?? Object.entries(routes).find(([k]) => k.endsWith("*") && key.startsWith(k.slice(0, -1)))?.[1];

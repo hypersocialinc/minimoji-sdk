@@ -92,6 +92,14 @@ prints; `--json` gives `avatarKey` and `previousKey`), and `--as kai-blue`
 keeps the edit as a new entry instead.
 An app showing a hard-coded key keeps the old look until you update the key.
 
+`npx minimoji voice kai 21m00Tcm4TlvDq8ikWAM` gives a library avatar an
+ElevenLabs voice (`--effect robot` for D.A.S.H.; `--list` shows your voices),
+and `npx minimoji say kai "[excited] Hi, I'm Billie"` makes the line, one
+ElevenLabs call on the developer's own key (`ELEVENLABS_API_KEY`, which is
+never sent to Minimoji): `minimoji-lines/hi-i-m-billie.json` plus a `.wav`.
+That JSON is a prebuilt line, played with `host.say(try SpeechLine(json: data), audio: wavURL)`. Never hand-roll TTS timestamps
+into a line: `say` already ran `buildLine` on them.
+
 - A **publishable key** (`mk_pub_…`, from minimoji.com/developers) lives in
   the app: it may bake heads, cut editor pieces, generate avatars and pick
   moods.

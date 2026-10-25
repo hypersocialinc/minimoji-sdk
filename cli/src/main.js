@@ -11,6 +11,7 @@ import { init } from "./init.js";
 import { avatars } from "./library.js";
 import { CliError, resolveBase } from "./service.js";
 import { skills } from "./skills.js";
+import { say, voice } from "./voice.js";
 
 export const VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 
@@ -49,6 +50,12 @@ const COMMANDS = {
   species: { run: species, options: { ...KEY, ...SITE, seed: { type: "string" }, pick: { type: "string", multiple: true }, open: { type: "boolean" } },
     usage: "minimoji species list | make <id> [--seed n] [--pick axis=option …] [--open]",
     about: "The species the service offers, and saving one (an alien, D.A.S.H., an animal) with picks from its kit." },
+  voice: { run: voice, options: { effect: { type: "string" }, settings: { type: "string", multiple: true }, clear: { type: "boolean" }, list: { type: "boolean" }, "elevenlabs-key": { type: "string" } },
+    usage: "minimoji voice <name|key> [<voice id|name>] [--effect robot|none] [--settings stability=0.4,speed=1.1] | <name|key> --clear | --list",
+    about: "Give an avatar an ElevenLabs voice, kept on its library entry (the id and settings, never your key); with no voice, print it. --list shows your ElevenLabs voices (ELEVENLABS_API_KEY)." },
+  say: { run: say, options: { voice: { type: "string" }, mood: { type: "string" }, out: { type: "string" }, name: { type: "string" }, effect: { type: "string" }, settings: { type: "string", multiple: true }, model: { type: "string" }, "dry-run": { type: "boolean" }, "elevenlabs-key": { type: "string" } },
+    usage: 'minimoji say <name|key> "Hi, I\'m Billie" [--voice id] [--mood happy] [--out minimoji-lines] [--name hello] [--effect robot|none] [--model eleven_v4] [--dry-run]',
+    about: `Turn a sentence into a line the avatar speaks: one ElevenLabs call on your key (ELEVENLABS_API_KEY), then <name>.wav and <name>.json (lip-sync, captions, moods) that every SDK line player plays. At most 1000 characters.` },
   render: { run: render, options: { size: { type: "string" }, face: { type: "string" }, out: { type: "string" } },
     usage: "minimoji render <avatarKey | name> [--size 64|128|256|512] [--face happy] [--out file.png]",
     about: "Download a saved avatar's still picture." },

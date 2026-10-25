@@ -134,6 +134,59 @@ takes an avatar, it reads an exact name first, then a full 64-hex key, then a
 key prefix of 8 or more characters that only one of your avatars starts
 with. A library holds 500 avatars.
 
+## Voices and spoken lines
+
+Give an avatar an ElevenLabs voice, then turn any sentence into a line it
+speaks. You bring your own ElevenLabs key: `export ELEVENLABS_API_KEY=…` (or
+`--elevenlabs-key`). It goes to api.elevenlabs.io and nowhere else. It is
+never sent to Minimoji, never written to a file and never printed.
+
+```sh
+minimoji voice kai 21m00Tcm4TlvDq8ikWAM          # Rachel, by id (no key needed)
+minimoji voice dash Brian --effect robot         # by name (looked up with your key); D.A.S.H.'s robot
+minimoji voice kai                               # what kai speaks with
+minimoji voice --list                            # your ElevenLabs voices: name and id
+minimoji say kai "[excited] Hi, I'm Billie"      # minimoji-lines/hi-i-m-billie.json + .wav
+```
+
+| Command | What it does |
+| --- | --- |
+| `minimoji voice <name \| key> <voice id \| name> [--effect robot\|none] [--settings stability=0.4,speed=1.1]` | keeps `{provider: "elevenlabs", voiceId, effect, settings}` on the library entry, so the voice follows you to any terminal you sign in to. An avatar not in your library yet is added first. The settings are ElevenLabs' `stability`, `similarity_boost`, `style` (0 to 1), `speed` (0.7 to 1.2) and `use_speaker_boost` |
+| `minimoji voice <name \| key>` | prints the voice, and the Minimoji app's own voice for it (`app voice: juniper`) when one is set. With no voice yet, it suggests one for the species |
+| `minimoji voice <name \| key> --clear` | removes the voice |
+| `minimoji voice --list` | lists your account's ElevenLabs voices, using your key |
+| `minimoji say <name \| key> "text" [--voice id] [--mood happy] [--out dir] [--name hello] [--effect robot\|none] [--model eleven_v4] [--dry-run]` | one ElevenLabs text-to-speech call with timestamps, then writes `<out>/<name>.wav` and `<out>/<name>.json` and prints both paths and the duration. `--json` gives `{line, audio, duration}` |
+
+- **The voice** comes from `--voice`, else the avatar's library entry. With
+  neither, `say` tells you to run `minimoji voice`. `--effect` and
+  `--settings` override the stored ones for one line.
+- **The line** is the public line format (`docs/speech-line-format.md`): mouth
+  frames, captions, timed words and mood cues. `[tags]` in the text (ElevenLabs'
+  audio tags, `[excited]`) leave the captions, and a mood tag sets the face.
+  `--mood` sets the face the line starts on. Every SDK line player plays it
+  with the audio beside it: React `useLine().say(line, { audio })`, the
+  vanilla bundle's `createLineSession`, `createLinePlayer`, or Swift
+  `MinimojiLinePlayer.say(line, audio:)`.
+- **The audio** is a 24 kHz 16-bit mono WAV. `say` asks ElevenLabs for raw
+  PCM (every tier has 24 kHz), so the CLI decodes it and runs the effect with
+  no ffmpeg and no native dependencies. Convert the WAV to mp3 yourself if
+  file size matters.
+- **`--effect robot`** is D.A.S.H.'s voice recipe: a 45 Hz tremolo and a faint
+  echo, with no change to pitch or tempo, so the word times still line up.
+- **Costs**: your key pays, one call per line. A line is at most 1,000
+  characters (and 60 seconds of audio), so a stray file can't spend your
+  credits. A bad `--mood` or an output folder that can't be written is
+  refused before the call. Audio that comes back longer than 60 s is kept as
+  `<name>.too-long.wav`, with an error saying to split the text. `--dry-run` prints the voice, the text and its character count and
+  sends nothing.
+- **The line builder** is the engine's `buildLine`, from the site's public
+  bundle (`https://www.minimoji.com/sdk/minimoji-heads.js`). The first `say`
+  downloads it over https and caches it in `~/.cache/minimoji` (or
+  `$XDG_CACHE_HOME/minimoji`). Later runs only check whether it changed, and
+  they work offline from the cache. That URL is fixed: no flag or variable
+  points it anywhere else. If it can't be downloaded or loaded, `say` stops
+  with one error before the paid call and writes nothing.
+
 ## Every command
 
 - `--json`: one JSON object on stdout; an error is `{"error": "…"}`.
