@@ -457,6 +457,27 @@ struct DashSaysHey: View {
   on-device dictation) give phrase captions and word cues, such as a nod on
   "yes". `transcript:` gives one caption over the voiced part. Samples in
   memory go through `say(pcm:sampleRate:…)` instead, which is not cached.
+- **A voice note with no transcript** (a recording a person made): build
+  the line with what the phone hears in it, then say it. The words give
+  phrase captions and word cues:
+
+  ```swift
+  import MinimojiLive
+  let line = try await SpeechLine.build(audioFile: note, transcribe: .onDevice)
+  host.say(line, audio: note)
+  ```
+
+  `.onDevice` is Apple's recognizer, on-device only: the audio never leaves
+  the phone (private). Add `NSSpeechRecognitionUsageDescription` to the
+  app's Info.plist; the person is asked once. It throws
+  `TranscriptionError.notAuthorized` on a no and `.unavailable` where the
+  language has no on-device model; then use
+  `.server(service: siteURL, key: "mk_pub_…")`, Minimoji's `POST /lines` (the
+  web SDK's path): the audio is sent to Minimoji and to ElevenLabs for
+  transcription and is not stored, at most 30 s, 200 a day per key. The Kit
+  reads any file AVFoundation does and sends it as a 16 kHz WAV (the route
+  takes WAV only).
+  `.custom { url in … }` takes your own speech service.
 - **Not prepared?** `say` still works. The line starts once it has been
   built (a 10 s clip takes a fraction of a second). `preparing` is true until
   then, and the head stays as it is.

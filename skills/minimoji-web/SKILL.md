@@ -210,7 +210,7 @@ export function DashSaysHey() {
 }
 ```
 
-- **The clip** is `{ audio, transcript?, words?, captions?, mood? }`.
+- **The clip** is `{ audio, transcript?, words?, captions?, mood?, transcribe? }`.
   `audio` can be a URL, a `Blob` (a TTS response), an `ArrayBuffer` or an
   `AudioBuffer`. `words` (`[{ text, start, end }]` in seconds, from your TTS
   provider's timestamps) give phrase captions and word cues, such as a nod on
@@ -219,6 +219,38 @@ export function DashSaysHey() {
   captions. Clips are cached by URL (or by the `Blob` or buffer object)
   together with their words, keeping the last 8. A URL that serves new audio
   each time needs a fresh URL per clip, or pass the `Blob`.
+- **A voice note with no transcript** (a recording a person made, a voice
+  chat message): pass your publishable key and the service to `useLine`, and
+  say the audio alone. The SDK sends it to Minimoji's `POST /lines`, which
+  transcribes it, and the line plays with phrase captions and word cues:
+
+  ```tsx
+  'use client';
+  import { useLine, MinimojiCaptions } from '@minimoji/react';
+
+  export function VoiceNote({ note }: { note: Blob }) {   // a Blob from MediaRecorder, a URL or bytes
+    const line = useLine({ transcribe: { key: process.env.NEXT_PUBLIC_MINIMOJI_KEY!, service: process.env.NEXT_PUBLIC_MINIMOJI_SERVICE_URL! } });
+    // wire line.performance / line.cue / line.expression to a <MinimojiHead> as above
+    return (
+      <>
+        <button type="button" onClick={() => line.say({ audio: note, transcribe: true })}>Play</button>
+        <MinimojiCaptions player={line} />
+      </>
+    );
+  }
+  ```
+
+  With `transcribe` on the hook, a clip with no `words`, `transcript` or
+  `captions` is transcribed even without `transcribe: true`, and if that
+  fails (over 30 s, offline, the key's 200 a day spent) it plays as the plain
+  waveform line with a console warning. With `transcribe: true` a failure
+  ends the say `onEnd(…, 'failed', error)` with the service's words.
+  `transcribe: false` never sends it. The SDK decodes any audio the browser
+  plays and sends it as a 16 kHz WAV; if you call `POST /lines` yourself,
+  send a WAV (it refuses mp3, m4a and webm, whose length it cannot check). **Privacy:**
+  the audio is sent to Minimoji and to ElevenLabs for transcription and is
+  not stored. Tell your people so where they record. The vanilla bundle's
+  `createVoicedPerformance({ …, transcribe: { key, service } })` does the same.
 - **Not prepared?** `say` still works. The line starts once it has been built
   (about 20 ms per second of audio on a laptop). `line.preparing` is true
   until then, and the head stays as it is.
