@@ -213,6 +213,22 @@ export function wordsFromCharacters(alignment) {
   return words.filter((w) => Number.isFinite(w.start) && Number.isFinite(w.end));
 }
 
+/** ElevenLabs' character timestamps → timed letters for buildLine's `letters`
+ *  (`[{text, start, end}]`, one character each, spaces kept, `[tags]`
+ *  dropped): the mouth is shaped from the words, the lips meeting on m/b/p
+ *  and only there (the engine's lettersFromAlignment) */
+export function lettersFromCharacters(alignment) {
+  const { characters = [], character_start_times_seconds: starts = [], character_end_times_seconds: ends = [] } = alignment ?? {};
+  const letters = [];
+  let inTag = false;
+  characters.forEach((text, i) => {
+    if (text === "[") inTag = true;
+    else if (text === "]") inTag = false;
+    else if (!inTag && Number.isFinite(starts[i]) && Number.isFinite(ends[i])) letters.push({ text, start: starts[i], end: ends[i] });
+  });
+  return letters;
+}
+
 // ─── the line builder, from the site ────────────────────────────────────────
 
 const cacheDir = (ctx) => join(ctx.env.XDG_CACHE_HOME || join(ctx.home, ".cache"), "minimoji");
@@ -368,7 +384,7 @@ export async function say(ctx, base, opts, out, [target, text, ...extra]) {
   }
   let line;
   try {
-    line = validateLine(buildLine({ pcm, sampleRate: SAMPLE_RATE, words: wordsFromCharacters(alignment), ...(opts.mood ? { mood: opts.mood } : {}) }));
+    line = validateLine(buildLine({ pcm, sampleRate: SAMPLE_RATE, words: wordsFromCharacters(alignment), letters: lettersFromCharacters(alignment), ...(opts.mood ? { mood: opts.mood } : {}) }));
   } catch (error) {
     throw new CliError(`could not build the line (${String(error?.message ?? error).split("\n")[0]})`);
   }

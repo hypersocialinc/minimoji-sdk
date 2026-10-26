@@ -210,14 +210,23 @@ export function DashSaysHey() {
 }
 ```
 
-- **The clip** is `{ audio, transcript?, words?, captions?, mood?, transcribe? }`.
+- **The clip** is `{ audio, transcript?, words?, letters?, alignment?, captions?, mood?, transcribe? }`.
   `audio` can be a URL, a `Blob` (a TTS response), an `ArrayBuffer` or an
   `AudioBuffer`. `words` (`[{ text, start, end }]` in seconds, from your TTS
   provider's timestamps) give phrase captions and word cues, such as a nod on
   "yes" or a laugh on "haha". A `transcript`, or a `captions` string, gives
   one caption over the voiced part. With none of these there are no
   captions. Clips are cached by URL (or by the `Blob` or buffer object)
-  together with their words, keeping the last 8. A URL that serves new audio
+  together with their words and letters, keeping the last 8.
+- **Pass your TTS alignment and the lips land on the letters.** A provider's
+  per-character timestamps shape the mouth from the words instead of guessing
+  from the sound: the lips meet on m, b and p and only there, and a vowel
+  never snaps shut. Hand ElevenLabs' `with-timestamps` reply over as it comes,
+  `say({ audio, words, alignment: tts.alignment })`, or as `letters`
+  (`[{ text, start, end }]`, one character each with the spaces, seconds;
+  `lettersFromAlignment` from `@minimoji/react` builds them). Words only (a
+  transcriber's) spread into letters with `lettersFromWords`. Without letters the mouth is guessed from the audio, as
+  before. A URL that serves new audio
   each time needs a fresh URL per clip, or pass the `Blob`.
 - **A voice note with no transcript** (a recording a person made, a voice
   chat message): pass your publishable key and the service to `useLine`, and

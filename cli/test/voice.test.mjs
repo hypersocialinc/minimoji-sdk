@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { readFile, readdir, stat, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ROBOT, lineName, parseSettings, pcmFromS16, robot, wav, wordsFromCharacters } from "../src/voice.js";
+import { ROBOT, lettersFromCharacters, lineName, parseSettings, pcmFromS16, robot, wav, wordsFromCharacters } from "../src/voice.js";
 import { fixtureServer, makeCtx, run, signIn, tempDir } from "./helpers.mjs";
 
 const RACHEL = "21m00Tcm4TlvDq8ikWAM";
@@ -161,8 +161,11 @@ test("say: one TTS request, a line that passes validateLine, a WAV as long as th
     assert.deepEqual(call.body, { text: "[excited] Hi, I'm Billie", model_id: "eleven_v4" });
     assert.deepEqual(said.json, { line: join(ctx.cwd, "lines/hi-i-m-billie.json"), audio: join(ctx.cwd, "lines/hi-i-m-billie.wav"), duration: said.json.duration });
 
-    const { validateLine } = await import(BUNDLE);
+    const { validateLine, buildLine } = await import(BUNDLE);
     const line = validateLine(JSON.parse(await readFile(said.json.line, "utf8")));
+    // the mouth is shaped from the reply's timed letters, not the waveform alone
+    const reply = speech(call.body.text), pcm = pcmFromS16((await readFile(said.json.audio)).subarray(44));
+    assert.deepEqual(line.frames, buildLine({ pcm, sampleRate: RATE, words: wordsFromCharacters(reply.alignment), letters: lettersFromCharacters(reply.alignment) }).frames);
     assert.deepEqual(line.words.map((w) => w.text), ["Hi,", "I'm", "Billie"], "the words match the text, the tag gone");
     assert.ok(line.captions.every((c) => !c.text.includes("[")), "the tag is dropped from the captions");
     assert.equal(line.captions.map((c) => c.text).join(" "), "Hi, I'm Billie");
@@ -408,6 +411,8 @@ test("audio and words: PCM in, WAV out; character timestamps to words, a tag kep
   const words = wordsFromCharacters({ characters: chars, character_start_times_seconds: chars.map((_, i) => i / 10), character_end_times_seconds: chars.map((_, i) => (i + 1) / 10) });
   assert.deepEqual(words, [{ text: "[excited]", start: 0, end: 0.9 }, { text: "Hi,", start: 1, end: 1.3 }, { text: "Bo", start: 1.4, end: 1.6 }]);
   assert.deepEqual(wordsFromCharacters({ characters: [..."[soft whisper] ok"], character_start_times_seconds: Array(17).fill(0), character_end_times_seconds: Array(17).fill(0) }).map((w) => w.text), ["[soft whisper]", "ok"], "a tag with a space stays one word");
+  assert.deepEqual(lettersFromCharacters({ characters: chars, character_start_times_seconds: chars.map((_, i) => i / 10), character_end_times_seconds: chars.map((_, i) => (i + 1) / 10) }).map((l) => l.text).join(""), " Hi, Bo", "a tag is not spoken; spaces part the words");
+  assert.deepEqual(lettersFromCharacters({ characters: ["m"], character_start_times_seconds: [0.1], character_end_times_seconds: [0.2] }), [{ text: "m", start: 0.1, end: 0.2 }]);
   assert.equal(lineName("[excited] Hi, I'm Billie!"), "hi-i-m-billie");
   assert.equal(lineName("[sighs]"), "line");
   assert.deepEqual(parseSettings(["stability=0.4", "speed=1.1,use_speaker_boost=false"]), { stability: 0.4, speed: 1.1, use_speaker_boost: false });

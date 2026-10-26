@@ -457,6 +457,14 @@ struct DashSaysHey: View {
   on-device dictation) give phrase captions and word cues, such as a nod on
   "yes". `transcript:` gives one caption over the voiced part. Samples in
   memory go through `say(pcm:sampleRate:…)` instead, which is not cached.
+- **Pass your TTS alignment and the lips land on the letters:** `letters:`
+  shapes the mouth from the words instead of guessing from the sound, so the
+  lips meet on m, b and p and only there, and a vowel never snaps shut.
+  `host.say(audioFile: url, words: words, letters: SpeechLine.letters(characters: a.characters, starts: a.starts, ends: a.ends))`
+  takes ElevenLabs' character alignment as it comes;
+  `SpeechLine.letters(spreading: words)` spreads word timings (on-device
+  dictation) into letters. Without letters the mouth is guessed from the
+  audio, as before.
 - **A voice note with no transcript** (a recording a person made): build
   the line with what the phone hears in it, then say it. The words give
   phrase captions and word cues:
@@ -514,9 +522,10 @@ struct DashSaysHey: View {
   line once, and the moving words are hidden from it. They must survive
   large Dynamic Type (shrink a headline beside the head instead).
 - **Building a line yourself**, offline (to store or send it):
-  `try SpeechLine.build(audioFile: url, words: words, mood: "happy")`
+  `try SpeechLine.build(audioFile: url, words: words, letters: letters, mood: "happy")`
   (`MinimojiLive`), with `words` as `[SpeechLine.Word(text:start:end:)]`
-  from your TTS provider's timestamps or on-device dictation. Without
+  from your TTS provider's timestamps or on-device dictation, and `letters`
+  (optional) as above. Without
   words, pass `transcript:` for one caption, or neither. It matches the
   website's builder; a 10 s line takes a fraction of a second. Never derive
   mouth shapes from letters.
