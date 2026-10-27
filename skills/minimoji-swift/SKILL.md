@@ -11,7 +11,7 @@ talks to the **avatar service** (`AvatarService`), and can build heads **on
 the device** (`MinimojiEngine`). This file is the rules and the smallest
 snippets; every Swift snippet is copied from the package
 [README](https://www.minimoji.com/developers/kit/README.md)
-or the Minimoji demo app, so it compiles against the version you pin. The
+or the Minimoji app, so it compiles against the version you pin. The
 [release notes](https://www.minimoji.com/developers/kit/RELEASE_NOTES.md)
 say what each version changed and what a host must do. Both links are on a
 private repository: read the copies inside the checked-out package

@@ -105,7 +105,7 @@ async function webTarget(cwd, project) {
   };
 }
 
-/** the demo app's convention (apps/minimoji-ios): MINIMOJI_PUBLISHABLE_KEY and
+/** the Minimoji app's convention (apps/minimoji-app): MINIMOJI_PUBLISHABLE_KEY and
  *  MINIMOJI_SERVICE_URL in the app's Info.plist, and in project.yml's info
  *  properties when xcodegen writes that plist. A project whose plist Xcode
  *  generates (no Info.plist file) gets a Minimoji.plist in the app folder:
