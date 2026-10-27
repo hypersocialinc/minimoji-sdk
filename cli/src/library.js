@@ -97,6 +97,41 @@ const shortKey = (key) => key.slice(0, 12);
 const day = (ms) => new Date(ms).toISOString().slice(0, 10);
 const json = ({ name, avatarKey, kind, createdAt, updatedAt }) => ({ name, avatarKey, kind, createdAt, updatedAt });
 
+/** the most characters a status may have (convex/lib/library.ts STATUS_MAX) */
+export const STATUS_MAX = 140;
+
+/** a status as one line: "on a deadline (focused, 2h ago)" */
+export function statusLine(status, now = Date.now()) {
+  const read = [status.mood, status.setAt ? ago(status.setAt, now) : null].filter(Boolean).join(", ");
+  return read ? `${status.text} (${read})` : status.text;
+}
+function ago(at, now) {
+  const minutes = Math.floor(Math.max(0, now - at) / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
+}
+
+/** `minimoji status <name|key> "text"` sets the line every app wearing the
+ *  avatar shows beside it (read for a mood once, on the service); with no
+ *  text it prints the status, with --clear it clears it */
+export async function status(ctx, base, opts, out, [target, ...words]) {
+  if (!target) throw new CliError('status needs an avatar (a name or a key): minimoji status kai "back at 3", minimoji status kai, or minimoji status kai --clear');
+  const text = words.join(" ").trim();
+  if (opts.clear && text) throw new CliError("--clear takes no text");
+  const entry = resolveTarget(target, await listLibrary(ctx, base));
+  const label = entry.name ?? entry.avatarKey.slice(0, 12);
+  if (!opts.clear && !text) {
+    const now = entry.status ?? null;
+    return out({ avatar: entry.name, avatarKey: entry.avatarKey, status: now }, now ? `${label}: ${statusLine(now)}` : `${label} has no status. Set one: minimoji status ${label} "back at 3"`);
+  }
+  if (text && [...text].length > STATUS_MAX) throw new CliError(`a status is at most ${STATUS_MAX} characters; this one is ${[...text].length}`);
+  const set = await sessionCall(ctx, base, "POST", "/cli/avatars/status", { avatarKey: entry.avatarKey, text: opts.clear ? null : text });
+  return out({ avatar: set.avatar.name, avatarKey: set.avatar.avatarKey, status: set.status },
+    set.status ? `${set.avatar.name}: ${statusLine(set.status)}. Every app wearing it shows this.` : `Cleared ${set.avatar.name}'s status.`);
+}
+
 export async function avatars(ctx, base, opts, out, [sub = "list", ...rest]) {
   if (sub === "list") {
     const entries = await listLibrary(ctx, base);
@@ -123,8 +158,9 @@ export async function avatars(ctx, base, opts, out, [sub = "list", ...rest]) {
       file = resolvePath(ctx.cwd, opts.out);
       await writeFile(file, `${JSON.stringify(doc, null, 2)}\n`);
     }
-    return out({ name: entry.name, avatarKey: entry.avatarKey, kind: entry.kind ?? (doc && doc.character ? "species" : "person"), doc, ...(file ? { file } : {}) },
-      [entry.avatarKey, file ? `Wrote ${file}.` : JSON.stringify(doc, null, 2)].join("\n"));
+    const status = entry.status ?? null;
+    return out({ name: entry.name, avatarKey: entry.avatarKey, kind: entry.kind ?? (doc && doc.character ? "species" : "person"), status, doc, ...(file ? { file } : {}) },
+      [entry.avatarKey, ...(status ? [`status: ${statusLine(status)}`] : []), file ? `Wrote ${file}.` : JSON.stringify(doc, null, 2)].join("\n"));
   }
   if (sub === "rename") {
     const [target, to] = rest;

@@ -711,6 +711,36 @@ user.minimoji = try await service.refresh(user.minimoji!.grantId)
   `service.addToLibrary(grantId, avatarKey:)` puts it in their library and
   picks it for your app (`.service` with a 403's words if they said no).
 
+### Their status, beside their head
+
+What a person types or says on the Minimoji app's you screen (or sets with
+`minimoji status`) is their avatar's status, and it comes with the grant:
+`refresh` answers `connected.status` (`GrantStatus`: `text`, `mood`,
+`gesture`, a `HeadGesture` raw value, `setDate`), nil when there is none. The mood was read once, on
+the service, when they set it: rest the head in it, never read it again.
+
+```swift
+// on foreground, and every 30 s while the status is on screen
+user.minimoji = try await service.refresh(user.minimoji!.grantId)
+
+ZStack(alignment: .topTrailing) {
+  MinimojiMetalHeadView(document: head, expression: user.minimoji?.status?.mood ?? "neutral").frame(width: 96, height: 96)
+  if let status = user.minimoji?.status {
+    MinimojiStatusBubble(text: status.text, size: 14)   // 11 in a list, 22 on a hero
+      .offset(x: 40, y: -8)                              // the tail leans down-left, at the head
+  }
+}
+```
+
+- `MinimojiStatusBubble(text:size:tail:)` (in `MinimojiKit`) is Bunch's
+  bubble: cream, at most two lines, the tail off the bottom-left corner
+  (`tail: .trailing` mirrors it, `.none` drops it). Lilita One when your app
+  registers it, else a rounded bold system face. `MinimojiStatusBubbleShape`
+  is the shape alone, for your own styling.
+- Per avatar, not per person: the status is the worn avatar's, so a re-pick
+  brings that avatar's line. Up to 140 characters; `setDate` gives "2h ago".
+- No push: poll `refresh`. A cleared status is `status == nil`.
+
 ## 10. Gotchas
 
 - **Never put `current` or locks on a photo request.** A selfie is always a

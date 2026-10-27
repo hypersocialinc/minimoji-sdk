@@ -134,6 +134,21 @@ takes an avatar, it reads an exact name first, then a full 64-hex key, then a
 key prefix of 8 or more characters that only one of your avatars starts
 with. A library holds 500 avatars.
 
+## Status
+
+The line beside your avatar in every app that wears it (Bunch, savethis, Fizz
+FM). It is kept on the library entry and read for a mood once, on the service;
+the Minimoji app's you screen sets the same line.
+
+```sh
+minimoji status kai "back at 3"     # set it: kai: back at 3 (happy, just now)
+minimoji status kai                 # print it
+minimoji status kai --clear         # clear it
+```
+
+A status is one line of at most 140 characters. `minimoji avatars get` prints
+it too.
+
 ## Voices and spoken lines
 
 Give an avatar an ElevenLabs voice, then turn any sentence into a line it

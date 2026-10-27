@@ -78,6 +78,16 @@ async function service(extra = {}) {
       Object.assign(entry, { avatarKey: body.to, updatedAt: 3 });
       return { json: { avatar: entry, from } };
     },
+    // convex/http.ts /cli/avatars/status: the line kept with the mood it read as, null clears
+    "POST /cli/avatars/status": ({ body }) => {
+      const entry = find(body);
+      if (!entry) return { status: 404, json: { error: "not in your library" } };
+      if (typeof body.text === "string" && [...body.text].length > 140) return { status: 400, json: { error: "a status is at most 140 characters" } };
+      if (body.text === null) delete entry.status;
+      else entry.status = { text: body.text, mood: "focused", gesture: null, setAt: Date.now() - 2 * 3_600_000 };
+      svc.statusCalls = (svc.statusCalls ?? 0) + 1;
+      return { json: { avatar: entry, status: entry.status ?? null } };
+    },
     "POST /cli/avatars/remove": ({ body }) => {
       const entry = find(body);
       if (!entry) return { status: 404, json: { error: "not in your library" } };
@@ -393,5 +403,35 @@ test("edit --as onto a key already kept under another name renames nothing and e
     assert.match(r.json.error, /could not add it to your library: it is already in your library as bob/);
     assert.deepEqual([...svc.library.keys()].sort(), ["bob", "kai"], "bob keeps its name");
     assert.ok(!svc.calls.some((c) => c.method === "POST" && c.path === "/cli/avatars" && c.body.name === "kai-blue"));
+  } finally { await svc.close(); }
+});
+
+test("status sets, prints and clears the line every app shows; avatars get shows it", async () => {
+  const svc = await service();
+  try {
+    const ctx = await signedIn(svc);
+    await run(ctx, ["avatars", "save", MINE, "--name", "kai", "--base", svc.url]);
+    let r = await run(ctx, ["status", "kai", "--base", svc.url]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.match(r.stdout, /kai has no status/);
+    r = await run(ctx, ["status", "kai", "on a deadline", "--base", svc.url]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.match(r.stdout, /kai: on a deadline \(focused, 2h ago\)\. Every app wearing it shows this\./);
+    r = await run(ctx, ["avatars", "get", "kai", "--base", svc.url, "--json"]);
+    assert.equal(r.json.status.text, "on a deadline");
+    r = await run(ctx, ["avatars", "get", "kai", "--base", svc.url]);
+    assert.match(r.stdout, /^a{64}\nstatus: on a deadline \(focused, 2h ago\)\n/);
+    r = await run(ctx, ["status", "kai", "x".repeat(141), "--base", svc.url]);
+    assert.equal(r.code, 1);
+    assert.match(r.stderr, /at most 140 characters; this one is 141/);
+    assert.equal(svc.statusCalls, 1, "an over-long line is refused before the service");
+    r = await run(ctx, ["status", "kai", "x", "--clear", "--base", svc.url]);
+    assert.match(r.stderr, /--clear takes no text/);
+    r = await run(ctx, ["status", "kai", "--clear", "--base", svc.url, "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.equal(r.json.status, null);
+    assert.equal(svc.library.get("kai").status, undefined);
+    r = await run(ctx, ["status", "nobody", "hi", "--base", svc.url]);
+    assert.equal(r.code, 1);
   } finally { await svc.close(); }
 });

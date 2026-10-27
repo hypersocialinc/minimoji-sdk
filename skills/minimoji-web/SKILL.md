@@ -725,7 +725,7 @@ import { MinimojiConnectButton, refreshMinimojiGrant } from '@minimoji/react';
 <MinimojiConnectButton minimojiKey={process.env.NEXT_PUBLIC_MINIMOJI_KEY} service={process.env.NEXT_PUBLIC_MINIMOJI_SERVICE_URL}
   onConnected={({ grantId, avatarKey }) => saveForUser({ grantId, avatarKey })} />   // 2. store both against your user
 // 3. on launch, follow their edits and re-picks; null means they disconnected your app
-const now = await refreshMinimojiGrant({ service, key, grantId });   // { grantId, avatarKey } | null
+const now = await refreshMinimojiGrant({ service, key, grantId });   // { grantId, avatarKey, status } | null
 ```
 
 - One live grant per app and person: connecting again (another device, or the person reconnecting) replaces the grant, and the old id answers 410. On a 410, re-read the grant you stored before clearing it; another device may have saved a new one.
@@ -742,6 +742,42 @@ const now = await refreshMinimojiGrant({ service, key, grantId });   // { grantI
   `POST /avatars`: `addToMinimojiLibrary({ service, key, grantId, avatarKey })`
   puts it in their library and picks it for your app (a 403 if they said no
   to that on the sheet).
+
+### Their status: the line beside their head
+
+What the person types or says on the Minimoji app's you screen (or sets with
+`npx minimoji status kai "back at 3"`) is their avatar's status, and it comes
+with the grant: `refreshMinimojiGrant` answers `status: { text, mood, gesture,
+setAt }`, or `status: null` when there is none. The mood was read once, on
+Minimoji's side, so every app shows the same face: never send `text` to
+`/expressions/pick` again.
+
+```jsx
+import { MinimojiStatusBubble, refreshMinimojiGrant } from '@minimoji/react';
+
+// on focus, and every 30 s while the head is on screen (a status changes without a re-pick)
+const grant = await refreshMinimojiGrant({ service, key, grantId });
+const status = grant?.status;   // { text: 'on a deadline', mood: 'thinking', gesture: 'ponder-tilt', setAt } | null
+
+<div style={{ position: 'relative' }}>
+  <div ref={anchor} data-minimoji="loading" style={{ width: 120, height: 120 }} />
+  {/* the tail's tip is the bubble's bottom-left: put it just above and right of the head */}
+  <MinimojiStatusBubble text={status?.text} size={14} style={{ position: 'absolute', left: '60%', bottom: '85%' }} />
+</div>
+<MinimojiHead avatar={avatar} anchor={anchor} expression={status?.mood ?? 'neutral'}
+  cue={status?.gesture ? { gesture: status.gesture, generation: status.setAt } : null} />
+```
+
+- `<MinimojiStatusBubble text size tail>` is Bunch's bubble (cream, Lilita
+  One, two lines at most, a 3° tilt); `size` is the text's px (Bunch draws
+  11, 14 and 22), `tail={false}` drops the tail. No text draws nothing. Load
+  Lilita One yourself (Google Fonts) or it falls back to a rounded system font.
+- `mood` is a face name for `expression` (null when the read was unsure:
+  keep the face). `gesture` is a track for `cue` (null: none); with
+  `generation: status.setAt` it plays once per new status, not on every poll.
+- `setAt` is epoch ms: say "2h ago" if you like.
+- No React? The heads bundle (`/sdk/minimoji-heads.js`) has
+  `mountStatusBubble(element, { text, size, tail })` → `{ update, destroy }`.
 
 ## 10. Never do
 

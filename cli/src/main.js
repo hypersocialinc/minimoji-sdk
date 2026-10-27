@@ -8,7 +8,7 @@ import { parseArgs } from "node:util";
 import { keys, login, logout, whoami } from "./auth.js";
 import { edit, generate, preview, render, species } from "./avatars.js";
 import { init } from "./init.js";
-import { avatars } from "./library.js";
+import { avatars, status } from "./library.js";
 import { CliError, resolveBase } from "./service.js";
 import { skills } from "./skills.js";
 import { lines } from "./lines.js";
@@ -46,7 +46,7 @@ const COMMANDS = {
     usage: 'minimoji edit <name|key> ["make the hair blue"] [--photo me.jpg] [--as new-name] [--open]',
     about: "Change an avatar with words, a photo or both. The name follows the edit (kai is now the new one); --as keeps it as a new entry instead. Spends a generation from the key's day." },
   avatars: { run: avatars, options: { name: { type: "string" }, out: { type: "string" } },
-    usage: "minimoji avatars [list] | save <key> [--name kai] | get <name|key> [--out kai.json] | rename <name|key> <new> | remove <name|key>",
+    usage: "minimoji avatars [list] | save <key> [--name kai] | get <name|key> [--out kai.json] (with its status) | rename <name|key> <new> | remove <name|key>",
     about: "Your library: the avatars you made or kept, on any terminal you sign in to. A name works wherever a key does." },
   species: { run: species, options: { ...KEY, ...SITE, seed: { type: "string" }, pick: { type: "string", multiple: true }, open: { type: "boolean" } },
     usage: "minimoji species list | make <id> [--seed n] [--pick axis=option …] [--open]",
@@ -54,6 +54,9 @@ const COMMANDS = {
   voice: { run: voice, options: { effect: { type: "string" }, settings: { type: "string", multiple: true }, clear: { type: "boolean" }, list: { type: "boolean" }, "elevenlabs-key": { type: "string" } },
     usage: "minimoji voice <name|key> [<voice id|name>] [--effect robot|none] [--settings stability=0.4,speed=1.1] | <name|key> --clear | --list",
     about: "Give an avatar an ElevenLabs voice, kept on its library entry (the id and settings, never your key); with no voice, print it. --list shows your ElevenLabs voices (ELEVENLABS_API_KEY)." },
+  status: { run: status, options: { clear: { type: "boolean" } },
+    usage: 'minimoji status <name|key> ["back at 3"] | <name|key> --clear',
+    about: "Set the line beside an avatar: every app wearing it (Bunch, savethis, …) shows it, with the mood it reads as. With no text, print it." },
   say: { run: say, options: { voice: { type: "string" }, mood: { type: "string" }, out: { type: "string" }, name: { type: "string" }, effect: { type: "string" }, settings: { type: "string", multiple: true }, model: { type: "string" }, "dry-run": { type: "boolean" }, "elevenlabs-key": { type: "string" } },
     usage: 'minimoji say <name|key> "Hi, I\'m Billie" [--voice id] [--mood happy] [--out minimoji-lines] [--name hello] [--effect robot|none] [--model eleven_v4] [--dry-run]',
     about: `Turn a sentence into a line the avatar speaks: one ElevenLabs call on your key (ELEVENLABS_API_KEY), then <name>.wav and <name>.json (lip-sync, captions, moods) that every SDK line player plays. At most 1000 characters.` },
