@@ -216,10 +216,14 @@ MinimojiMetalHeadView(document: theirs).frame(width: 96, height: 96)
 ### Showing a head while it loads
 
 Do not draw your own placeholder: `MinimojiHeadPoster` (in `MinimojiMetal`)
-is the head's own loader, the one the website shows — the still soft and
-breathing, a cross-fade with a puff when the head is ready, the sharp still
-on an error, a plain swap under Reduce Motion. No Metal view exists until the
-head is ready, so a feed of them is cheap.
+is the head's own loader, the one the website shows. The box is never blank:
+a local, soft breathing silhouette draws from the placement estimate immediately,
+then cross-fades to the still when it arrives and to the live head with a puff
+when it is ready. On a head error the still stays sharp. No Metal view exists until the
+head is ready, so a feed of them is cheap. `tint:` colours the silhouette
+(default grey; use a contrasting shade of the tile colour). A failed still
+leaves the silhouette sharp; `.none` keeps it until the live head arrives.
+Reduce Motion swaps both handovers without animation.
 
 ```swift
 MinimojiHeadPoster(still: .url(service.renderURL(for: avatarKey, size: 256))) {

@@ -118,9 +118,12 @@ export function Dash() {
 
 Do not draw your own placeholder. A head is built a moment after the page
 paints; until it lands, `<MinimojiHeadPoster>` inside the anchor shows the
-head's own still: it comes in soft and breathes, then gives way with a puff
+local silhouette immediately, then the head's own still: it comes in soft
+and breathes, then gives way with a puff
 when the head is ready, stays sharp on an error, and is a plain swap under
-reduced motion. The same loader as the homepage and the Swift Kit.
+reduced motion. The silhouette takes `currentColor` (set `style.color` to a
+contrasting tile tint), fades as the still arrives, and stays sharp if the
+still fails. The same loader as the homepage and the Swift Kit.
 
 ```tsx
 'use client';
