@@ -390,7 +390,13 @@ export function DashSaysHey() {
   `createLiveVisemeTimeline` and `createSpeechVoice` (not in this package
   yet: ask Minimoji) are the web twins of the Swift Kit's
   `LiveVisemes` and `SpeechVoice`: PCM in, a viseme and a level out, eased
-  into a mouth per head.
+  into a mouth per head. **Look-ahead** (voice chat): delay the voice's
+  playout by 100 ms on your side and pass `lookAhead: .1` to
+  `createLiveVisemeTimeline` (settable later as `timeline.lookAhead`): the
+  shapes lead the sound by 70 ms and the lips meet on m, b and p before
+  they are heard. Not where the speaker hears themselves (their own mic):
+  there it is only lag. It adds to `playoutOffset`. Without it a closure
+  shows as the voice comes back; a fading vowel never shuts the mouth.
 
 ### Emotes with speech
 

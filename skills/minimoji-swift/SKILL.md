@@ -393,6 +393,15 @@ func performanceSnapshot(at hostTime: TimeInterval) -> AvatarPerformanceSnapshot
   `FaceLife.inhale(length:lead:)` are on a `FaceLife` you drive yourself).
   `SpeechVoice(articulate: false)` / `LiveVisemes(…, articulate: false)`
   bring back the pre-9.40 mouth.
+- **Look-ahead** (voice chat): delay the voice's playout by 100 ms on your
+  side and say so: `LiveVisemes(sampleRate: 48_000, lookAhead: 0.1)` (or set
+  `visemes.lookAhead` any time). The shapes then lead the sound by 70 ms and
+  the lips meet on m, b and p before they are heard. 100 ms is inaudible in
+  a voice note and barely so in chat. Not where the speaker hears
+  themselves (their own mic, a karaoke monitor): there it is only lag. It
+  adds to `playoutOffset`. Without it a closure shows as the voice comes
+  back (a dip only counts once the level recovers, so fading vowels never
+  shut the mouth).
 - Pitch is off by default (it costs CPU). With `LiveVisemes(sampleRate:
   48_000, pitch: true)`, read `let (viseme, level, pitch) =
   visemes.voice(at: hostTime)` and pass `voice.sample(dt:viseme:level:pitch:)`,
