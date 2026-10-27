@@ -187,6 +187,41 @@ minimoji say kai "[excited] Hi, I'm Billie"      # minimoji-lines/hi-i-m-billie.
   points it anywhere else. If it can't be downloaded or loaded, `say` stops
   with one error before the paid call and writes nothing.
 
+## Lines from clips you already have
+
+Have recordings already (another TTS, a human voice, an earlier batch)?
+`minimoji lines` turns each one into the same `<name>.json` line `say`
+writes, on your Minimoji key alone: no ElevenLabs key anywhere.
+
+```sh
+minimoji lines ./clips --texts lines.json --timings   # clips/<name>.json + <name>.timings.json per clip
+minimoji lines hello.wav --text "Hi, I'm Billie"      # one clip, its words given
+minimoji lines ./clips --dry-run                       # what would be sent; nothing is
+```
+
+| Command | What it does |
+| --- | --- |
+| `minimoji lines <clip \| folder>… [--text "…" \| --texts lines.json] [--out dir] [--timings] [--dry-run]` | one `POST /lines` per clip; writes `<name>.json` beside the clip (or in `--out`) and, with `--timings`, `<name>.timings.json` = `{transcript, words, letters, alignedTo, loss?}` (seconds). `--json` gives `{clips: [{clip, name, status, line, timings?, alignedTo?, loss?, reason?}], skipped}` |
+
+- **The text** of a clip comes from `--text` (one clip), `--texts`
+  (`{"<name>": "text"}`, or the `{"<name>": {"text": …}}` of an app's
+  `lines.json`) or a `<name>.txt` beside it. With it, the service
+  force-aligns that script to the audio, so the lips follow the words as
+  written (`alignedTo: "text"`; a high `loss` says text and audio disagree).
+  A clip with no text is transcribed (`alignedTo: "transcript"`). `[tags]`
+  in the text set the face and are never sent to the aligner.
+- **The clips**: `.wav` is read as is; `.mp3` and `.m4a` need `ffmpeg` on the
+  PATH (one clear line says so). A folder means its clips, not its
+  subfolders. Each is sent as a 16-bit mono WAV at its own rate (48 kHz at
+  most).
+- **Limits**: at most 30 s a clip and 2,000 characters of text. A clip over
+  them, or one that can't be read, is skipped with the reason and the rest
+  carry on; the exit code is 1 if any was skipped. A refused key, a spent
+  day (each clip is one of the key's 200 lines a day) or the route switched
+  off stops the run.
+- **Privacy**: the audio and the text go to Minimoji and to ElevenLabs, and
+  are not stored.
+
 ## Every command
 
 - `--json`: one JSON object on stdout; an error is `{"error": "…"}`.

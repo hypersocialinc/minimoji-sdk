@@ -228,6 +228,32 @@ export function DashSaysHey() {
   transcriber's) spread into letters with `lettersFromWords`. Without letters the mouth is guessed from the audio, as
   before. A URL that serves new audio
   each time needs a fresh URL per clip, or pass the `Blob`.
+- **Any voice, not only ElevenLabs.** Every provider's timings become our
+  words (`[{ text, start, end }]`, seconds) with a small reader from
+  `@minimoji/react` (also in `/sdk/minimoji-heads.js`); then
+  `say({ audio, words, letters: lettersFromWords(words) })`:
+
+  | Provider | What it gives | Reader |
+  |---|---|---|
+  | ElevenLabs with-timestamps | characters + start/end arrays | `alignment: tts.alignment` (or `lettersFromAlignment`); `wordsFromAlignment(tts.alignment)` for the words |
+  | ms words you stored | `{ text, startMs, durationMs }` | `wordsFromMs(words)` |
+  | Azure Speech | WordBoundary events: `text`, `audioOffset` + `duration` in 100 ns ticks | `wordsFromAzure(events)` (punctuation boundaries skipped) |
+  | Amazon Polly | speech marks: JSON lines `{ time (ms), type: "word", value }` | `wordsFromPolly(marks, clipSeconds)` (a word ends where the next starts; a cut-off line throws) |
+  | Cartesia | `word_timestamps: { words, start, end }` (seconds) | `wordsFromCartesia(word_timestamps)` (one or a stream's pieces) |
+  | Dictation, Scribe | words only | `lettersFromWords(words)` |
+  | OpenAI TTS, any voice with no timings, a human take | nothing | `say({ audio, transcript: 'what it says', transcribe: true })`: the service aligns the text to the audio |
+
+  Spread letters are an estimate (the lips still meet inside the right
+  word); a provider's characters, or the service's alignment, are exact.
+- **Clips you already have, in a batch:** `npx minimoji lines ./clips --texts lines.json --timings`
+  sends each clip (`.wav`, or `.mp3`/`.m4a` with ffmpeg) with its text to
+  `POST /lines` on your Minimoji key and writes `<name>.json` (the playable
+  line: `say(line, { audio })`) beside it; `--timings` adds
+  `<name>.timings.json` (`{ transcript, words, letters, alignedTo, loss }`)
+  for an app that keeps its own line format. The text comes from `--text`,
+  `--texts` (`{ "<name>": "text" }` or `{ "<name>": { text } }`) or a
+  `<name>.txt` beside the clip; a clip with none is transcribed. `--dry-run`
+  sends nothing. Each clip is one of the key's 200 lines a day, at most 30 s.
 - **A voice note with no transcript** (a recording a person made, a voice
   chat message): pass your publishable key and the service to `useLine`, and
   say the audio alone. The SDK sends it to Minimoji's `POST /lines`, which
@@ -256,8 +282,18 @@ export function DashSaysHey() {
   ends the say `onEnd(…, 'failed', error)` with the service's words.
   `transcribe: false` never sends it. The SDK decodes any audio the browser
   plays and sends it as a 16 kHz WAV; if you call `POST /lines` yourself,
-  send a WAV (it refuses mp3, m4a and webm, whose length it cannot check). **Privacy:**
-  the audio is sent to Minimoji and to ElevenLabs for transcription and is
+  send a WAV (it refuses mp3, m4a and webm, whose length it cannot check).
+  **Know what it says?** Give the clip its `transcript` with
+  `transcribe: true` (and no words or letters): the SDK sends the text too,
+  the service force-aligns that script to the audio instead of transcribing
+  it, and the lips follow the words as written (the answer says
+  `alignedTo: 'text'`; a high `loss` means text and audio disagree; a
+  transcript with no words outside its `[tags]`, or over 2,000 characters,
+  is transcribed as before). Calling
+  it yourself: `multipart/form-data` with `audio` (the WAV) and `text`
+  (at most 2,000 characters; `[tags]` are kept off the aligner and set the
+  face). **Privacy:**
+  the audio (and the text, if given) is sent to Minimoji and to ElevenLabs for transcription or alignment and is
   not stored. Tell your people so where they record. The vanilla bundle's
   `createVoicedPerformance({ …, transcribe: { key, service } })` does the same.
 - **Not prepared?** `say` still works. The line starts once it has been built

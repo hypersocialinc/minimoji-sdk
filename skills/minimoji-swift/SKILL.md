@@ -474,6 +474,32 @@ struct DashSaysHey: View {
   `SpeechLine.letters(spreading: words)` spreads word timings (on-device
   dictation) into letters. Without letters the mouth is guessed from the
   audio, as before.
+- **Any voice, not only ElevenLabs.** Every provider's timings become
+  `[SpeechLine.Word]` (seconds) with a reader, then
+  `letters: SpeechLine.letters(spreading: words)`:
+
+  | Provider | What it gives | Reader |
+  |---|---|---|
+  | ElevenLabs with-timestamps | characters + start/end arrays | `SpeechLine.letters(characters:starts:ends:)`; `SpeechLine.words(characters:starts:ends:)` for the words |
+  | ms words you stored | `{ text, startMs, durationMs }` | `SpeechLine.words(ms: [SpeechLine.MsWord])` |
+  | Azure Speech | WordBoundary: `text`, `audioOffset` + `duration` in 100 ns ticks | `SpeechLine.words(azure: [SpeechLine.AzureWord])` (punctuation boundaries skipped) |
+  | Amazon Polly | speech marks, JSON lines `{ time (ms), type: "word", value }` | `try SpeechLine.words(polly: jsonLines, duration: clipSeconds)` (or `[SpeechLine.PollyMark]`; a cut-off line throws) |
+  | Cartesia | `word_timestamps: { words, start, end }` (seconds) | `SpeechLine.words(cartesia: SpeechLine.CartesiaTimestamps(…))` |
+  | Dictation, Scribe | words only | `SpeechLine.letters(spreading: words)` |
+  | OpenAI TTS, any voice with no timings, a human take | nothing | `SpeechLine.build(audioFile: clip, text: "what it says", transcribe: .server(…))`: the service aligns the text to the audio |
+
+  The readers are the web SDK's, held to the same fixtures. Spread letters
+  are an estimate; a provider's characters, or the service's alignment, are
+  exact.
+- **Clips you already have, in a batch:** `npx minimoji lines ./Voice --texts lines.json --timings`
+  sends each clip (`.wav`, or `.mp3`/`.m4a` with ffmpeg) with its text to
+  `POST /lines` on your Minimoji key and writes `<name>.json` (a line:
+  `SpeechLine(json:)`) beside it; `--timings` adds `<name>.timings.json`
+  (`{ transcript, words, letters, alignedTo, loss }`, seconds) for an app that
+  keeps its own line format. The text comes from `--text`, `--texts`
+  (`{ "<name>": "text" }` or `{ "<name>": { text } }`) or a `<name>.txt`
+  beside the clip; a clip with none is transcribed. `--dry-run` sends
+  nothing. Each clip is one of the key's 200 lines a day, at most 30 s.
 - **A voice note with no transcript** (a recording a person made): build
   the line with what the phone hears in it, then say it. The words give
   phrase captions and word cues:
@@ -494,6 +520,11 @@ struct DashSaysHey: View {
   transcription and is not stored, at most 30 s, 200 a day per key. The Kit
   reads any file AVFoundation does and sends it as a 16 kHz WAV (the route
   takes WAV only).
+  **Know what it says?** `SpeechLine.build(audioFile: clip, text: "Hi, I'm Mini!", transcribe: .server(…))`
+  sends the text too: the service force-aligns that script to the audio
+  instead of transcribing it, so the lips follow the words as written
+  (`transcription(…).alignedTo == "text"`; a high `loss` means text and
+  audio disagree). `.onDevice` and `.custom` ignore `text`, and a text with no words outside its `[tags]`, or over 2,000 characters, is transcribed as before.
   `.custom { url in … }` takes your own speech service.
 - **Not prepared?** `say` still works. The line starts once it has been
   built (a 10 s clip takes a fraction of a second). `preparing` is true until

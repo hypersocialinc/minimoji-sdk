@@ -11,6 +11,7 @@ import { init } from "./init.js";
 import { avatars } from "./library.js";
 import { CliError, resolveBase } from "./service.js";
 import { skills } from "./skills.js";
+import { lines } from "./lines.js";
 import { say, voice } from "./voice.js";
 
 export const VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
@@ -56,6 +57,9 @@ const COMMANDS = {
   say: { run: say, options: { voice: { type: "string" }, mood: { type: "string" }, out: { type: "string" }, name: { type: "string" }, effect: { type: "string" }, settings: { type: "string", multiple: true }, model: { type: "string" }, "dry-run": { type: "boolean" }, "elevenlabs-key": { type: "string" } },
     usage: 'minimoji say <name|key> "Hi, I\'m Billie" [--voice id] [--mood happy] [--out minimoji-lines] [--name hello] [--effect robot|none] [--model eleven_v4] [--dry-run]',
     about: `Turn a sentence into a line the avatar speaks: one ElevenLabs call on your key (ELEVENLABS_API_KEY), then <name>.wav and <name>.json (lip-sync, captions, moods) that every SDK line player plays. At most 1000 characters.` },
+  lines: { run: lines, options: { ...KEY, text: { type: "string" }, texts: { type: "string" }, out: { type: "string" }, timings: { type: "boolean" }, "dry-run": { type: "boolean" } },
+    usage: 'minimoji lines <clip|folder>… [--text "Hi!" | --texts lines.json] [--out <dir>] [--timings] [--dry-run]',
+    about: "Clips you already have (any voice) → <name>.json lines beside them, on your Minimoji key. With a clip's text (--text, --texts or <name>.txt) the lips follow the script (forced alignment); without, it is transcribed. --timings also writes <name>.timings.json (words + letters). At most 30 s a clip." },
   render: { run: render, options: { size: { type: "string" }, face: { type: "string" }, out: { type: "string" } },
     usage: "minimoji render <avatarKey | name> [--size 64|128|256|512] [--face happy] [--out file.png]",
     about: "Download a saved avatar's still picture." },

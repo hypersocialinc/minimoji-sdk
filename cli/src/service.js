@@ -29,14 +29,17 @@ export function resolveSite(opts, env) {
 }
 
 /** one route of the contract: the parsed JSON body, or a CliError in the
- *  route's own words. `allow` lists statuses handed back instead of thrown */
+ *  route's own words. `allow` lists statuses handed back instead of thrown.
+ *  `body` is sent as JSON, or as it is when it is a FormData */
 export async function call(ctx, base, method, path, { token, body, allow = [] } = {}) {
   const headers = { Accept: "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  // a FormData body is multipart: fetch writes its type and boundary
+  const form = typeof FormData === "function" && body instanceof FormData;
+  if (body !== undefined && !form) headers["Content-Type"] = "application/json";
   let res;
   try {
-    res = await ctx.fetch(`${base}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    res = await ctx.fetch(`${base}${path}`, { method, headers, body: body === undefined ? undefined : form ? body : JSON.stringify(body) });
   } catch (error) {
     throw new CliError(`could not reach ${base} (${error?.cause?.code ?? error?.message ?? error})`);
   }
@@ -99,7 +102,7 @@ export async function sessionCall(ctx, base, method, path, body) {
   try {
     return (await call(ctx, base, method, path, { token: session.token, body })).data;
   } catch (error) {
-    if (error.status === 401) throw new CliError(`${error.message.replace(/^.*?: /, "")}; run minimoji login again`);
+    if (error.status === 401) throw Object.assign(new CliError(`${error.message.replace(/^.*?: /, "")}; run minimoji login again`), { status: 401 });
     throw error;
   }
 }
