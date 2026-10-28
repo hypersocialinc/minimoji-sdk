@@ -213,7 +213,7 @@ export function DashSaysHey() {
 }
 ```
 
-- **The clip** is `{ audio, transcript?, words?, letters?, alignment?, captions?, mood?, transcribe? }`.
+- **The clip** is `{ audio, transcript?, words?, letters?, alignment?, captions?, mood?, cues?, transcribe? }`.
   `audio` can be a URL, a `Blob` (a TTS response), an `ArrayBuffer` or an
   `AudioBuffer`. `words` (`[{ text, start, end }]` in seconds, from your TTS
   provider's timestamps) give phrase captions and word cues, such as a nod on
@@ -393,6 +393,52 @@ export function DashSaysHey() {
   face quietly (no emote burst at the start); audio tags in the words
   (`[excited]`, `[curious]`, `[whispers]`…) leave the captions and become
   quiet face changes at their word (`TAG_MOODS`), `[laughs]` a laugh.
+
+#### Directing the line: your own cues, a look, stage directions
+
+A script can time the head to its words. `clip.cues` are your cues, merged
+with the ones the SDK derives (a nod on "yes"…); `at` is seconds or a word
+of the clip (`{ word: 7 }`, an index into the timed words from 0, or
+`{ word: 'card', nth? }`). The stored line holds seconds. A word the clip
+does not say fails the say, naming the word.
+
+```tsx
+import type { RefObject } from 'react';
+import { lookTargetFor, type LinePlayerApi } from '@minimoji/react';
+
+// `line` is your useLine(); `words` your TTS provider's timed words; the refs your head's anchor and the card
+export function present(line: LinePlayerApi, audio: string, words: { text: string; start: number; end: number }[],
+                        anchor: RefObject<HTMLDivElement | null>, card: RefObject<HTMLDivElement | null>) {
+  line.say({ audio, words, cues: [
+    { at: { word: 7 }, gesture: 'knowing-nod' },
+    { at: 3.2, look: { x: .6, y: -.2 }, hold: 2 },                            // eyes up-right for 2 s
+    { at: { word: 'card' }, look: lookTargetFor(card.current!, anchor.current!) },  // at the card on the page
+  ] });
+}
+```
+
+| cue | does |
+| --- | --- |
+| `{ at, mood, k? }` | a face (k under 0.35: quietly, no emote) |
+| `{ at, gesture }` | one of the engine's tracks (`knowing-nod`, `head-shake`…) |
+| `{ at, nod: true }` / `{ at, shake: true }` | the face's own nod / shake |
+| `{ at, brow: 'up' \| 'down', k }` | a brow accent |
+| `{ at, look, hold? }` | eyes on `{ x, y }` (−1…1, + right / up), `'away'` (aside, alternating sides) or `'viewer'` (back to you), for `hold` s (1.2 by default), then the head's own gaze |
+
+Tags in the words or transcript do the same with no code, and leave the
+captions: `[nod]` `[shake]` `[brow]` `[brow down]` `[look away]`
+`[look back]` `[smile]` (plus the mood tags, `[surprised]`…). An authored
+gesture, brow or look within 0.6 s of a derived one replaces it. The look
+rides in `line.performance` (and `line.look`), so the head needs nothing
+new. `lookTargetFor(el, anchorEl)` turns two DOM rects into the `{ x, y }`.
+
+**No line at all (a game's NPC, a party host):** `playCues(stage, cues, clock?)`
+plays the same cues (seconds from the start) on their own clock, through the
+same dispatch. `cueStage(head.life)` is the stage for one head (`onReady`
+hands you the head; give that `<MinimojiHead>` `look="manual"` so its own look
+setting does not take the eyes back). With no `clock` it runs on timers; with
+one (`() => seconds`) call `tick()` from your game loop. It returns
+`{ tick, stop, done }`.
 
 ### Driving the mouth yourself (your own clock)
 
@@ -603,6 +649,9 @@ export function Reacting({ avatar }: { avatar: AvatarInput }) {
   three. One shot only: chain the next from `onGestureEnd`, which always
   comes (cancelled when replaced, the next frame under
   `performances={false}`).
+- To time moods, gestures and looks to a script (or play them with no audio
+  in a game), see "Directing the line" in § 4: `clip.cues`, the `[nod]`-style
+  tags and `playCues`.
 - `performances={false}` stills every one-shot, cues included (reduced
   motion). To cue your own gestures over a beat, pass `emotes={false}`,
   not `performances={false}`.

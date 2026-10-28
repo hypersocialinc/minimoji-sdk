@@ -601,6 +601,42 @@ struct DashSaysHey: View {
   quiet face changes at their word (`SpeechLine.tagMoods`); `[laughs]` plays
   the laugh. Pass the provider's words as they come.
 
+#### Directing the line: your own cues, a look, stage directions
+
+A script can time the head to its words. `SpeechLine.build(…, cues:)` takes
+your cues (`SpeechLine.AuthoredCue`), merged with the derived ones; `at` is
+`.seconds(3.2)`, `.word(7)` (an index into the timed words, from 0) or
+`.text("card", nth: 0)`. The line keeps seconds; a word the line does not
+say throws `BuildError.cueWord`.
+
+```swift
+let line = try SpeechLine.build(audioFile: url, words: words, letters: letters, cues: [
+  .init(at: .word(7), .gesture(.knowingNod)),
+  .init(at: .seconds(3.2), .look(.point(x: 0.6, y: -0.2), hold: 2)),
+  .init(at: .text("card"), .look(.away)),
+])
+host.say(line, audio: url)
+```
+
+| `AuthoredCue.Kind` / `SpeechCue` | does |
+| --- | --- |
+| `.mood(_, intensity:)` | a face (under 0.35: quietly, no emote) |
+| `.gesture(_)` | one authored track (`HeadGesture`) |
+| `.nod` / `.shake` | the face's own nod / shake (`knowing-nod` / `head-shake` on a neutral face) |
+| `.brow(up:intensity:)` | a brow accent (shows nothing yet) |
+| `.look(_, hold:)` | eyes on `.point(x:y:)` (−1…1, + right / up), `.away` (aside, alternating sides) or `.viewer`, for `hold` s (1.2 by default), then the head's own gaze |
+
+Tags in the words or transcript do the same with no code and leave the
+captions: `[nod]` `[shake]` `[brow]` `[brow down]` `[look away]`
+`[look back]` `[smile]`. An authored gesture, brow or look within 0.6 s of a
+derived one replaces it. `MinimojiLinePlayer` publishes the held look
+(`look`) and hands it to the head in its performance snapshot.
+
+**No line at all (a game's NPC, a party host):** `CuePlayer(cues)` plays
+`SpeechCue`s (seconds from its start) on a head's `FaceLife` as your clock
+crosses them: call `advance(to: elapsed, on: life)` each frame (false once
+everything played and a look let go), `stop(on:)` to let go.
+
 ### A host that talks (onboarding, tours)
 
 A character that says one line per screen: `MinimojiLinePlayer` plus a
