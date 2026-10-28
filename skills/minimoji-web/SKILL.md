@@ -248,6 +248,53 @@ export function DashSaysHey() {
 
   Spread letters are an estimate (the lips still meet inside the right
   word); a provider's characters, or the service's alignment, are exact.
+- **No audio, only words? Say the text.** Give `useLine` a `synthesize`
+  (your publishable key and the service) and say `{ text, voice }`: Minimoji's
+  `POST /lines/say` speaks it on its own ElevenLabs voice and answers the
+  WAV and the line built on it, the letters timed on that very audio, so the
+  mouth timings come from the call that made the sound. `voice` is a name from
+  `GET /lines/voices` (`dash` is D.A.S.H.: Brian with the robot effect;
+  `person`, `alien`, `cat`, `penguin`, `ghost`…), or one of their ids as
+  `{ voiceId, effect: 'robot', settings }`; any other ElevenLabs voice id
+  needs your own key (below), since Minimoji's account speaks only its
+  catalogue. A text past about 60 s of speech (~900 characters at speed 1)
+  is refused before anything is spent. `prepare({ text, voice })` ahead
+  of the click makes the say start inside it (a repeat is never asked again):
+
+  ```tsx
+  'use client';
+  import { useEffect } from 'react';
+  import { useLine, MinimojiCaptions, type TextClip } from '@minimoji/react';
+
+  const HI: TextClip = { text: "[happy] Hi, I'm D.A.S.H.!", voice: 'dash' };
+
+  export function DashSaysHi() {
+    const line = useLine({ synthesize: { key: process.env.NEXT_PUBLIC_MINIMOJI_KEY!, service: process.env.NEXT_PUBLIC_MINIMOJI_SERVICE_URL! } });
+    useEffect(() => { line.prepare(HI).catch(() => {}); }, []);
+    // wire line.performance / line.cue / line.expression to a <MinimojiHead> as above
+    return (
+      <>
+        <button type="button" onClick={() => line.say(HI)}>Say hi</button>
+        <MinimojiCaptions player={line} />
+      </>
+    );
+  }
+  ```
+
+  `[tags]` set the face. On Minimoji's voice a key has 5,000
+  characters a UTC day (a repeat of the same line costs none: it is served
+  from the cache), then a 429 with the reset. **Bring your own ElevenLabs
+  key** for no character quota and any voice on your account: `synthesize: { key, service, elevenLabsKey }`
+  sends it in the `ElevenLabs-Key` header (never a query string; it is used
+  for the one call and never stored or logged); the minute limit stays.
+  Calling it yourself: `POST /lines/say` with `Authorization: Bearer mk_pub_…`
+  and `{ text, voice, mood? }` answers `{ audio, line, words, letters,
+  durationMs, cached, charged }`; play `say(answer.line, { audio:
+  answer.audio })`. **Audio you process afterwards** (isolated, mixed, sped
+  up) no longer matches those letters: send the final clip with its text to
+  `POST /lines` (multipart `{ audio, text }`, below) for letters aligned on it.
+  From a terminal: `npx minimoji say kai "Hi" --server` writes the same
+  `<name>.wav` + `<name>.json` on your Minimoji key.
 - **Clips you already have, in a batch:** `npx minimoji lines ./clips --texts lines.json --timings`
   sends each clip (`.wav`, or `.mp3`/`.m4a` with ffmpeg) with its text to
   `POST /lines` on your Minimoji key and writes `<name>.json` (the playable

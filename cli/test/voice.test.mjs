@@ -418,3 +418,49 @@ test("audio and words: PCM in, WAV out; character timestamps to words, a tag kep
   assert.deepEqual(parseSettings(["stability=0.4", "speed=1.1,use_speaker_boost=false"]), { stability: 0.4, speed: 1.1, use_speaker_boost: false });
   for (const bad of [["stability=2"], ["volume=1"], ["speed="], ["use_speaker_boost=yes"]]) assert.throws(() => parseSettings(bad), /--settings/);
 });
+
+test("say --server: POST /lines/say on the Minimoji key, the same <name>.wav + <name>.json as the local path, no ElevenLabs call and never the ElevenLabs key", async () => {
+  const { buildLine, validateLine } = await import(BUNDLE);
+  const wavBytes = wav(new Float32Array(RATE / 2).fill(0.1), RATE);
+  const said = [];
+  let origin = null;
+  const answer = (body) => {
+    const tts = speech(body.text);
+    const line = buildLine({ pcm: pcmFromS16(Buffer.from(tts.audio_base64, "base64")), sampleRate: RATE, words: wordsFromCharacters(tts.alignment), letters: lettersFromCharacters(tts.alignment) });
+    return { audio: `${origin}/say/owner/abc.wav`, format: "wav", durationMs: Math.round(line.duration * 1000), line, words: [], letters: [], transcript: body.text, chars: body.text.length, charged: body.text.length, cached: false, voice: { name: null, voiceId: RACHEL, effect: "none" } };
+  };
+  const server = await fixtureServer({
+    "GET /cli/avatars": () => ({ json: { avatars: [{ name: "kai", avatarKey: KAI, kind: "person", createdAt: 1, updatedAt: 1, ttsVoice: { provider: "elevenlabs", voiceId: RACHEL, effect: "robot" } }] } }),
+    "POST /lines/say": ({ body, auth }) => { said.push({ body, auth }); return { json: answer(body) }; },
+    "GET /say/*": () => ({ body: wavBytes, headers: { "Content-Type": "audio/wav" } }),
+  });
+  origin = server.url;
+  try {
+    const ctx = await makeCtx({ env: { MINIMOJI_API: server.url, MINIMOJI_KEY: "mk_sec_" + "1".repeat(40), ELEVENLABS_API_KEY: SECRET } });
+    ctx.elevenlabsAPI = server.url;
+    await signIn(ctx, server.url);
+    const r = await run(ctx, ["say", "kai", "Hello there", "--server", "--out", "lines", "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.deepEqual(said[0].body, { text: "Hello there", voice: { voiceId: RACHEL, effect: "robot" }, model: "eleven_v4" }, "the entry's voice, its effect too");
+    assert.equal(said[0].auth, `Bearer mk_sec_${"1".repeat(40)}`, "on the Minimoji key");
+    assert.equal(r.json.line, join(ctx.cwd, "lines", "hello-there.json"));
+    assert.equal(r.json.audio, join(ctx.cwd, "lines", "hello-there.wav"));
+    assert.deepEqual(await readFile(r.json.audio), wavBytes, "the audio the service answered, byte for byte");
+    validateLine(JSON.parse(await readFile(r.json.line, "utf8")));
+    assert.ok(!server.calls.some((c) => c.path.startsWith("/v1/") || c.path.startsWith("/v2/")), "no ElevenLabs call");
+    assert.ok(server.calls.every((c) => !c.raw.includes(SECRET) && !JSON.stringify(c.headers).includes(SECRET)), "the ElevenLabs key never reaches our service");
+    const named = await run(ctx, ["say", "kai", "Beep", "--server", "--voice", "dash", "--name", "beep", "--json"]);
+    assert.equal(named.code, 0, named.stderr);
+    assert.equal(said[1].body.voice, "dash", "a catalogue name goes as a name");
+    const dry = await run(ctx, ["say", "kai", "Hi", "--server", "--dry-run", "--json"]);
+    assert.equal(dry.json.dryRun, true);
+    assert.equal(said.length, 2, "--dry-run sends nothing");
+    const mixed = await run(ctx, ["say", "kai", "Hi", "--server", "--elevenlabs-key", SECRET]);
+    assert.equal(mixed.code, 1);
+    assert.match(mixed.stderr, /--server speaks on Minimoji's voice.*drop one of them/);
+    assert.ok(!mixed.stderr.includes(SECRET));
+    const bad = await run(ctx, ["say", "kai", "Hi", "--server", "--voice", "Rachel Green"]);
+    assert.equal(bad.code, 1);
+    assert.match(bad.stderr, /--server takes a voice id or a name from GET \/lines\/voices/);
+  } finally { await server.close(); }
+});

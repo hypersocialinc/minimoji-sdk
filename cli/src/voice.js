@@ -8,6 +8,10 @@
 // api.elevenlabs.io and nowhere else: never to our service, never into a
 // file, never printed. The stored voice is an id, an effect and settings.
 //
+// `say --server` speaks on Minimoji's voice instead (POST /lines/say, with
+// the Minimoji key, metered in characters): no ElevenLabs key at all, and the
+// person's own is never sent there. It writes the same two files.
+//
 // buildLine is not copied into the CLI. The site's public vanilla bundle
 // (minimoji.com/sdk/minimoji-heads.js) exports it; `say` downloads that
 // file over https, caches it by content hash, and imports it. The URL is a
@@ -17,7 +21,7 @@ import { createHash } from "node:crypto";
 import { access, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join, resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
-import { CliError, call, sessionCall } from "./service.js";
+import { CliError, call, keyedCall, sessionCall } from "./service.js";
 import { AVATAR_KEY, listLibrary, resolveTarget, slugify } from "./library.js";
 import { table } from "./auth.js";
 
@@ -348,6 +352,7 @@ export async function say(ctx, base, opts, out, [target, text, ...extra]) {
     chosen = { voiceId: entry.ttsVoice.voiceId, effect: opts.effect ?? entry.ttsVoice.effect ?? "none", ...((settings ?? entry.ttsVoice.settings) ? { settings: settings ?? entry.ttsVoice.settings } : {}) };
   }
   const model = opts.model ?? DEFAULT_MODEL;
+  if (opts.server) return sayOnServer(ctx, base, opts, out, { text, chosen, model, name, outDir });
   const request = { voice: chosen.voiceId, effect: chosen.effect, model, text, characters: text.length, ...(chosen.settings ? { settings: chosen.settings } : {}) };
   if (opts["dry-run"]) {
     return out({ dryRun: true, ...request, out: join(outDir, `${name}.json`) },
@@ -400,4 +405,50 @@ export async function say(ctx, base, opts, out, [target, text, ...extra]) {
   }
   const duration = line.duration;
   return out({ line: linePath, audio: audioPath, duration }, `Wrote ${linePath}\n  and ${audioPath} (${duration.toFixed(2)} s).`);
+}
+
+/** a catalogue name (GET /lines/voices) as the service takes it; anything else must be an ElevenLabs voice id */
+const CATALOGUE_NAME = /^[a-z]{2,20}$/;
+
+/** `say --server`: POST /lines/say on the Minimoji key, then the audio it
+ *  answered downloaded, written beside the line as the local path writes
+ *  them (both files or neither) */
+async function sayOnServer(ctx, base, opts, out, { text, chosen, model, name, outDir }) {
+  // your ElevenLabs key never goes to our service: --server speaks on Minimoji's voice, so the two don't mix
+  if (opts["elevenlabs-key"]) throw new CliError("--server speaks on Minimoji's voice (your Minimoji key's characters); --elevenlabs-key is for the local path: drop one of them");
+  const given = chosen.voiceId;
+  let voice;
+  if (opts.voice && CATALOGUE_NAME.test(given) && !opts.effect && !opts.settings) voice = given;
+  else if (ELEVEN_ID.test(given)) voice = { voiceId: given, effect: chosen.effect, ...(chosen.settings ? { settings: chosen.settings } : {}) };
+  else throw new CliError(`--server takes a voice id or a name from GET /lines/voices (dash, person, alien…), not "${given.slice(0, 40)}"`);
+  const body = { text, voice, model, ...(opts.mood ? { mood: opts.mood } : {}) };
+  if (opts["dry-run"]) {
+    return out({ dryRun: true, server: true, ...body, characters: text.length, out: join(outDir, `${name}.json`) },
+      [`Would send ${text.length} characters to Minimoji's voice (POST /lines/say, ${model}, voice ${typeof voice === "string" ? voice : voice.voiceId}):`, `  ${text}`, `and write ${join(outDir, `${name}.json`)} + .wav. Nothing was sent.`].join("\n"));
+  }
+  try { await mkdir(outDir, { recursive: true }); } catch (error) {
+    throw new CliError(`can't write lines into ${outDir} (${error?.code ?? error?.message ?? error})`);
+  }
+  const answer = await keyedCall(ctx, base, opts, "POST", "/lines/say", body);
+  if (typeof answer?.audio !== "string" || !/^https?:\/\//.test(answer.audio) || !answer.line) throw new CliError("POST /lines/say answered without audio or a line");
+  let bytes;
+  try {
+    const res = await ctx.fetch(answer.audio);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    bytes = Buffer.from(await res.arrayBuffer());
+  } catch (error) {
+    throw new CliError(`the line was spoken but its audio could not be downloaded (${error?.message ?? error}); run say --server again (a repeat costs no characters)`);
+  }
+  const linePath = join(outDir, `${name}.json`), audioPath = join(outDir, `${name}.wav`);
+  const pending = [[audioPath, bytes], [linePath, `${JSON.stringify(answer.line)}\n`]].map(([path, b]) => [path, `${path}.${process.pid}.tmp`, b]);
+  try {
+    for (const [, tmp, b] of pending) await writeFile(tmp, b);
+    for (const [path, tmp] of pending) await rename(tmp, path);
+  } catch (error) {
+    await Promise.all(pending.map(([, tmp]) => rm(tmp, { force: true })));
+    throw new CliError(`could not write the line into ${outDir} (${error?.code ?? error?.message ?? error}); run say --server again (a repeat costs no characters)`);
+  }
+  const duration = answer.line.duration;
+  return out({ line: linePath, audio: audioPath, duration, server: true, chars: answer.chars, charged: answer.charged, cached: answer.cached },
+    `Wrote ${linePath}\n  and ${audioPath} (${Number(duration).toFixed(2)} s, ${answer.cached ? "from the cache, no characters" : `${answer.charged} characters of Minimoji's voice`}).`);
 }

@@ -465,6 +465,28 @@ struct DashSaysHey: View {
 }
 ```
 
+- **No audio, only words? Say the text** (`MinimojiLive`):
+  `SpeechLine.say(text:voice:service:key:)` has Minimoji's `POST /lines/say`
+  speak it on its own ElevenLabs voice and returns the line built on that
+  audio (the letters timed on it) and the WAV, downloaded to a file:
+
+  ```swift
+  let said = try await SpeechLine.say(text: "[happy] Hi, I'm D.A.S.H.!", voice: "dash", service: site, key: "mk_pub_…")
+  host.say(said.line, audio: said.audioFile)
+  ```
+
+  `voice` is a name from `GET /lines/voices` (`dash`, `person`, `alien`,
+  `penguin`, `ghost`…) or a voice id (`effect: "robot"` for D.A.S.H.'s
+  sound): on Minimoji's voice only the catalogue's ids, any id with your own
+  key. A text past about 60 s of speech (~900 characters) is refused before
+  anything is spent; a key has
+  5,000 characters a UTC day on Minimoji's voice, a repeat of the same line
+  costs none (`said.cached`), past it `.refused(status: 429, …)` with the
+  reset. `elevenLabsKey:` speaks on your own ElevenLabs account instead (the
+  `ElevenLabs-Key` header, never stored): no character quota, the minute
+  limit stays. Audio you process afterwards no longer matches the letters:
+  build that clip with `SpeechLine.build(audioFile:text:transcribe: .server(…))`
+  (`POST /lines` aligns the text on the final clip).
 - **Words, a transcript or neither:** `words:` as
   `[SpeechLine.Word(text:start:end:)]` (your TTS provider's timestamps or
   on-device dictation) give phrase captions and word cues, such as a nod on
