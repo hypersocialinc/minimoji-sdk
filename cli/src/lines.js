@@ -11,6 +11,7 @@
 // A .wav is read here; an .mp3 or .m4a goes through ffmpeg, which must be on
 // the PATH (the rule apps/minimoji-app/scripts/gen-dash-lines.mjs uses).
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve as resolvePath } from "node:path";
 import { promisify } from "node:util";
@@ -121,7 +122,7 @@ export async function readTexts(ctx, file) {
 /** each file written aside, then renamed in, the line last: a line on disk always has the timings of its own run
  *  beside it (a failed rename leaves the old line, never a new one beside old timings) */
 async function writeAll(files) {
-  const pending = files.map(([path, text]) => [path, `${path}.${process.pid}.tmp`, text]).reverse();
+  const pending = files.map(([path, text]) => [path, `${path}.${process.pid}.${randomUUID()}.tmp`, text]).reverse();
   try {
     for (const [, tmp, text] of pending) await writeFile(tmp, text);
     for (const [path, tmp] of pending) await rename(tmp, path);

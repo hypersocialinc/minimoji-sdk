@@ -12,6 +12,7 @@ import { avatars, status } from "./library.js";
 import { CliError, resolveBase } from "./service.js";
 import { skills } from "./skills.js";
 import { lines } from "./lines.js";
+import { serve } from "./mcp.js";
 import { say, voice } from "./voice.js";
 
 export const VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
@@ -66,6 +67,9 @@ const COMMANDS = {
   render: { run: render, options: { size: { type: "string" }, face: { type: "string" }, out: { type: "string" } },
     usage: "minimoji render <avatarKey | name> [--size 64|128|256|512] [--face happy] [--out file.png]",
     about: "Download a saved avatar's still picture." },
+  mcp: { run: (ctx, base, opts) => serve(ctx, base, opts, VERSION), options: { ...SITE, out: { type: "string" } },
+    usage: "minimoji mcp [--out <dir>] [--base prod|dev]",
+    about: "Serve the commands as MCP tools over stdio, as this signed-in terminal, for an agent in Claude, Cursor or any MCP client: claude mcp add minimoji -- npx -y minimoji mcp. No key in any tool; files go to --out (default: here)." },
   preview: { run: preview, options: { ...SITE, face: { type: "string" }, body: { type: "boolean" }, "no-browser": { type: "boolean" } },
     usage: "minimoji preview <avatarKey | name | doc.json> [--face happy] [--body] [--no-browser]",
     about: "Open the avatar on minimoji.com/preview. A local document rides in the link's fragment and is never uploaded." },

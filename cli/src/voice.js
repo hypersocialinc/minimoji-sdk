@@ -17,7 +17,7 @@
 // file over https, caches it by content hash, and imports it. The URL is a
 // constant: no flag or variable points it elsewhere (the tests hand ctx a
 // fixture's URL, as they hand it a fixture ElevenLabs).
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { access, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join, resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -395,7 +395,7 @@ export async function say(ctx, base, opts, out, [target, text, ...extra]) {
   }
   // both files or neither: each is written aside, then both are renamed in
   const linePath = join(outDir, `${name}.json`), audioPath = join(outDir, `${name}.wav`);
-  const pending = [[audioPath, wav(pcm, SAMPLE_RATE)], [linePath, `${JSON.stringify(line)}\n`]].map(([path, bytes]) => [path, `${path}.${process.pid}.tmp`, bytes]);
+  const pending = [[audioPath, wav(pcm, SAMPLE_RATE)], [linePath, `${JSON.stringify(line)}\n`]].map(([path, bytes]) => [path, `${path}.${process.pid}.${randomUUID()}.tmp`, bytes]);
   try {
     for (const [, tmp, bytes] of pending) await writeFile(tmp, bytes);
     for (const [path, tmp] of pending) await rename(tmp, path);
@@ -437,10 +437,10 @@ async function sayOnServer(ctx, base, opts, out, { text, chosen, model, name, ou
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     bytes = Buffer.from(await res.arrayBuffer());
   } catch (error) {
-    throw new CliError(`the line was spoken but its audio could not be downloaded (${error?.message ?? error}); run say --server again (a repeat costs no characters)`);
+    throw new CliError(`the line was spoken but its audio could not be downloaded (${error?.message ?? error}); it is at ${answer.audio}, and saying it again costs no characters`);
   }
   const linePath = join(outDir, `${name}.json`), audioPath = join(outDir, `${name}.wav`);
-  const pending = [[audioPath, bytes], [linePath, `${JSON.stringify(answer.line)}\n`]].map(([path, b]) => [path, `${path}.${process.pid}.tmp`, b]);
+  const pending = [[audioPath, bytes], [linePath, `${JSON.stringify(answer.line)}\n`]].map(([path, b]) => [path, `${path}.${process.pid}.${randomUUID()}.tmp`, b]);
   try {
     for (const [, tmp, b] of pending) await writeFile(tmp, b);
     for (const [path, tmp] of pending) await rename(tmp, path);
@@ -449,6 +449,7 @@ async function sayOnServer(ctx, base, opts, out, { text, chosen, model, name, ou
     throw new CliError(`could not write the line into ${outDir} (${error?.code ?? error?.message ?? error}); run say --server again (a repeat costs no characters)`);
   }
   const duration = answer.line.duration;
-  return out({ line: linePath, audio: audioPath, duration, server: true, chars: answer.chars, charged: answer.charged, cached: answer.cached },
+  // the audio's public URL and the timings too: an agent (minimoji mcp) or a web page needs no file
+  return out({ line: linePath, audio: audioPath, duration, server: true, chars: answer.chars, charged: answer.charged, cached: answer.cached, audioUrl: answer.audio, words: answer.words ?? null, letters: answer.letters ?? null },
     `Wrote ${linePath}\n  and ${audioPath} (${Number(duration).toFixed(2)} s, ${answer.cached ? "from the cache, no characters" : `${answer.charged} characters of Minimoji's voice`}).`);
 }

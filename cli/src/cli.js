@@ -23,11 +23,15 @@ function openURL(url) {
   }
 }
 
+// a reader that went away (`| head`, an MCP client that quit) is the end, not a crash
+process.stdout.on("error", (error) => { if (error.code === "EPIPE") process.exit(process.exitCode ?? 0); throw error; });
+
 const code = await main(process.argv.slice(2), {
   env: process.env,
   cwd: process.cwd(),
   home: homedir(),
   hostname: hostname().replace(/\.local$/, ""),
+  stdin: process.stdin,
   stdout: (s) => process.stdout.write(s),
   stderr: (s) => process.stderr.write(s),
   fetch: globalThis.fetch,

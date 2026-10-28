@@ -69,6 +69,14 @@ export async function availableSkills(ctx, sha) {
   return skills;
 }
 
+/** one skill's SKILL.md at `--ref` (else main), as text: what `minimoji mcp`
+ *  serves as a resource, so an agent reads the guide without installing it */
+export async function skillText(ctx, name, opts = {}) {
+  if (!NAME.test(name)) throw new CliError(`"${name}" is not a skill name`);
+  const sha = await resolveRef(ctx, opts);
+  return stampSource(await (await get(ctx, `${raw(ctx)}/${SKILLS_REPO}/${sha}/skills/${name}/SKILL.md`, "text/markdown, */*")).text(), sha);
+}
+
 /** a SKILL.md with the commit it came from in its frontmatter */
 export function stampSource(text, sha) {
   const line = `minimoji-source: ${SKILLS_REPO}@${sha}`;

@@ -237,6 +237,51 @@ minimoji lines ./clips --dry-run                       # what would be sent; not
 - **Privacy**: the audio and the text go to Minimoji and to ElevenLabs, and
   are not stored.
 
+## Use it from an agent (MCP)
+
+`minimoji mcp` serves the commands as tools over stdio (the Model Context
+Protocol), so an agent in Claude Code, Claude Desktop, Cursor or any MCP
+client can make avatars, set statuses and say lines with no key to bring.
+It runs as this signed-in terminal: run `minimoji login` first. No tool
+takes a key, and `login`, `logout` and `keys` are not tools.
+
+Claude Code:
+
+```sh
+claude mcp add minimoji -- npx -y minimoji mcp
+```
+
+Claude Desktop (`claude_desktop_config.json`) and Cursor (`.cursor/mcp.json`,
+or `~/.cursor/mcp.json` for every project):
+
+```json
+{
+  "mcpServers": {
+    "minimoji": { "command": "npx", "args": ["-y", "minimoji", "mcp"] }
+  }
+}
+```
+
+| Tool | What it does | What it spends |
+| --- | --- | --- |
+| `whoami`, `list_avatars`, `list_species`, `list_voices`, `get_status` | Read the account, the library, the species, the voices, a status | nothing |
+| `make_avatar` | From words, a photo (a path or an https URL) or both; kept in the library | one generation each, `count` ≤ 3 |
+| `edit_avatar` | Change one with words or a photo; `save_as` keeps it as a new entry | one generation |
+| `make_species_avatar` | A species with picks from its kit, kept in the library | nothing |
+| `set_status` | The line beside the avatar in every app wearing it | one status change |
+| `say` | A line on Minimoji's voice: the audio URL, `line`, `words`, `letters`, and the `.wav` + `.json` written here | the text's characters of the day's 5,000 (a repeat is free) |
+| `lines` | A clip you have + its text → a line, with timings | one line build |
+| `render_still` | The still PNG, written here | nothing |
+| `preview_link` | A minimoji.com link that shows it in 3D | nothing |
+
+`say` with `voice_source: "elevenlabs"` speaks on your own ElevenLabs account
+instead, from `ELEVENLABS_API_KEY` in the server's environment (the `env`
+of the client config), never a tool argument. Files are written to the
+folder the client starts the server in (`~/Minimoji` when that is `/` or read-only, as Claude Desktop starts servers), or `minimoji mcp --out <dir>`. The
+resources `minimoji://skill/web` and `minimoji://skill/swift` are the SDK
+guides `minimoji skills` installs. `--base dev` serves another deployment.
+Logs go to stderr; stdout is the protocol.
+
 ## Every command
 
 - `--json`: one JSON object on stdout; an error is `{"error": "…"}`.
