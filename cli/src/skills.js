@@ -30,8 +30,10 @@ export async function detectAgent(ctx, opts) {
     if (!AGENT_DIRS[opts.agent]) throw new CliError(`--agent is ${Object.keys(AGENT_DIRS).join(" or ")}`);
     return opts.agent;
   }
-  if (await exists(join(ctx.cwd, ".claude"))) return "claude";
-  for (const marker of ["AGENTS.md", ".agents", ".codex"]) if (await exists(join(ctx.cwd, marker))) return "codex";
+  // turbopackIgnore: the hosted connector (apps/web) bundles this file, and a
+  // path from ctx.cwd would otherwise trace the whole repo into its function
+  if (await exists(join(/* turbopackIgnore: true */ ctx.cwd, ".claude"))) return "claude";
+  for (const marker of ["AGENTS.md", ".agents", ".codex"]) if (await exists(join(/* turbopackIgnore: true */ ctx.cwd, marker))) return "codex";
   return "claude";
 }
 
@@ -134,9 +136,9 @@ export async function addSkills(ctx, opts, names) {
   const wanted = names.length ? names : [...available.keys()];
   const missing = wanted.filter((n) => !available.has(n));
   if (missing.length) throw new CliError(`no skill ${missing.map((n) => `"${n}"`).join(", ")} in ${SKILLS_REPO}; it has ${[...available.keys()].join(", ") || "none"}`);
-  const dir = join(ctx.cwd, AGENT_DIRS[agent]);
+  const dir = join(/* turbopackIgnore: true */ ctx.cwd, AGENT_DIRS[agent]);
   const installed = [];
-  for (const name of wanted) await refuseForeign(join(dir, name));
+  for (const name of wanted) await refuseForeign(join(/* turbopackIgnore: true */ dir, name));
   for (const name of wanted) installed.push(await install(ctx, dir, name, available.get(name), sha));
   return { agent, ref: sha, installed };
 }

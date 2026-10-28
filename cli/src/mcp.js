@@ -287,9 +287,11 @@ const text = (data) => [{ type: "text", text: JSON.stringify(data, null, 2) }];
 const failed = (message) => ({ content: [{ type: "text", text: message }], isError: true });
 
 /** one tools/call: the result MCP answers, an error in it when the command
- *  failed (`isError`, the command's one line, never a stack) */
-export async function callTool(ctx, base, server, name, args) {
-  const tool = TOOLS.find((t) => t.name === name);
+ *  failed (`isError`, the command's one line, never a stack). The hosted
+ *  connector (apps/web/lib/mcp) calls this too, with its own `tools` (these
+ *  minus lines, photos as chat attachments) and its own `fetchPhoto` */
+export async function callTool(ctx, base, server, name, args, { tools = TOOLS, fetchPhoto = photoFile } = {}) {
+  const tool = tools.find((t) => t.name === name);
   if (!tool) return null;
   // the command's stdout is the transport: it goes to stderr; and no browser opens for an agent
   // paths the agent gives (a photo, a clip) are the client's, read from where the server runs; files written go to outDir
@@ -299,7 +301,7 @@ export async function callTool(ctx, base, server, name, args) {
     checkArgs(tool, args);
     args ??= {};
     if (!(await signedIn(ctx, base))) throw new CliError(`this terminal is not signed in to Minimoji; run minimoji login${base === BASES.prod ? "" : ` --base ${baseName(base)}`} in a terminal, then call ${name} again`);
-    if (tool.photo) photo = await photoFile(ctx, args.photo);
+    if (tool.photo) photo = await fetchPhoto(ctx, args.photo);
     const plan = await tool.plan(args, photo.file, server.outDir, ctx.cwd);
     let data = null;
     const out = (d) => { data = d; return 0; };

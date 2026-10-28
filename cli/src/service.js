@@ -57,13 +57,16 @@ export async function call(ctx, base, method, path, { token, body, allow = [] } 
 }
 
 // the credentials file: {deployments: {<base>: {token, label, prefix, secretKey?}}},
-// readable by its owner alone, like ~/.npmrc or gh's hosts.yml
+// readable by its owner alone, like ~/.npmrc or gh's hosts.yml. A ctx with
+// `credentials: {read, write}` keeps them elsewhere (the hosted connector,
+// apps/web/lib/mcp, holds one person's sealed in their account)
 export function configDir(ctx) {
   return ctx.env.MINIMOJI_CONFIG_DIR ?? join(ctx.env.XDG_CONFIG_HOME || join(ctx.home, ".config"), "minimoji");
 }
 export const credentialsPath = (ctx) => join(configDir(ctx), "credentials.json");
 
 export async function readCredentials(ctx) {
+  if (ctx.credentials) return ctx.credentials.read();
   let text;
   try { text = await readFile(credentialsPath(ctx), "utf8"); } catch (error) {
     if (error.code === "ENOENT") return { deployments: {} };
@@ -78,6 +81,7 @@ export async function readCredentials(ctx) {
 }
 
 export async function writeCredentials(ctx, creds) {
+  if (ctx.credentials) return ctx.credentials.write(creds);
   const dir = configDir(ctx), file = credentialsPath(ctx), tmp = `${file}.${process.pid}.tmp`;
   await mkdir(dir, { recursive: true, mode: 0o700 });
   await writeFile(tmp, `${JSON.stringify(creds, null, 2)}\n`, { mode: 0o600 });

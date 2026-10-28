@@ -237,6 +237,20 @@ minimoji lines ./clips --dry-run                       # what would be sent; not
 - **Privacy**: the audio and the text go to Minimoji and to ElevenLabs, and
   are not stored.
 
+## Use Minimoji in Claude
+
+In Claude (on the web, Desktop or mobile) Minimoji is a connector, with
+nothing to install: Settings → Connectors → Add custom connector, the URL
+
+```
+https://www.minimoji.com/mcp
+```
+
+then sign in with your Minimoji account. The tools below work as you, minus
+`lines`; a photo is one you attach in the chat, and `say` and `render_still`
+answer URLs instead of writing files. `minimoji mcp` stays for local agents
+(Claude Code, Cursor) and for files written next to your code.
+
 ## Use it from an agent (MCP)
 
 `minimoji mcp` serves the commands as tools over stdio (the Model Context
