@@ -1,6 +1,6 @@
 {
   "name": "minimoji",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "The Minimoji command line: sign in, mint keys, set a Swift or React app up, install the agent skills, and make Mini avatars from the terminal.",
   "type": "module",
   "bin": { "minimoji": "src/cli.js" },
