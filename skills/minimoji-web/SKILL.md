@@ -782,6 +782,14 @@ const status = grant?.status;   // { text: 'on a deadline', mood: 'thinking', ge
 - No React? The heads bundle (`/sdk/minimoji-heads.js`) has
   `mountStatusBubble(element, { text, size, tail })` → `{ update, destroy }`.
 
+
+A status may carry an optional `voice` (`url`, `durationMs`, `words`, and optional
+`letters: {characters, starts, ends}`). Download the clip and play it with the
+line player using these timings, without transcription. In Swift use
+`try voice.line(audioFile: downloadedURL)`, then `MinimojiLinePlayer.say`;
+on the web use `lettersFromAlignment` when building the line. Partner apps
+choose their own play control. These clips are public URL media.
+
 ## 10. Never do
 
 - Never hand-draw or keyframe talking, blinking or emoting: feed speech
