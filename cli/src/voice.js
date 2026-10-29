@@ -22,7 +22,8 @@ import { access, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises
 import { join, resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 import { CliError, call, keyedCall, sessionCall } from "./service.js";
-import { AVATAR_KEY, listLibrary, resolveTarget, slugify } from "./library.js";
+import { AVATAR_KEY, keyFor, listLibrary, resolveTarget, slugify } from "./library.js";
+import { previewFor } from "./avatars.js";
 import { table } from "./auth.js";
 
 export const ELEVENLABS_API = "https://api.elevenlabs.io";
@@ -340,19 +341,20 @@ export async function say(ctx, base, opts, out, [target, text, ...extra]) {
   if (!/^[A-Za-z0-9][\w.-]{0,79}$/.test(name)) throw new CliError(`--name "${name}" is not a file name: letters, digits, dots, dashes and underscores`);
   const outDir = resolvePath(ctx.cwd, opts.out ?? "minimoji-lines");
 
-  // the voice: --voice, else the library entry's
-  let chosen;
+  // the voice: --voice, else the library entry's (and with it the avatar's key, for the play link)
+  let chosen, avatarKey = AVATAR_KEY.test(target) ? target : null;
   if (opts.voice) {
     const settings = parseSettings(opts.settings);
     chosen = { voiceId: opts.voice, effect: opts.effect ?? "none", ...(settings ? { settings } : {}) };
   } else {
     const entry = resolveTarget(target, await listLibrary(ctx, base), { anyKey: AVATAR_KEY.test(target) });
+    avatarKey = entry.avatarKey;
     if (!entry.ttsVoice) throw new CliError(`${entry.name ?? target} has no voice yet; minimoji voice ${entry.name ?? target} <voice> sets one, or pass --voice`);
     const settings = parseSettings(opts.settings);
     chosen = { voiceId: entry.ttsVoice.voiceId, effect: opts.effect ?? entry.ttsVoice.effect ?? "none", ...((settings ?? entry.ttsVoice.settings) ? { settings: settings ?? entry.ttsVoice.settings } : {}) };
   }
   const model = opts.model ?? DEFAULT_MODEL;
-  if (opts.server) return sayOnServer(ctx, base, opts, out, { text, chosen, model, name, outDir });
+  if (opts.server) return sayOnServer(ctx, base, opts, out, { text, chosen, model, name, outDir, target, avatarKey });
   const request = { voice: chosen.voiceId, effect: chosen.effect, model, text, characters: text.length, ...(chosen.settings ? { settings: chosen.settings } : {}) };
   if (opts["dry-run"]) {
     return out({ dryRun: true, ...request, out: join(outDir, `${name}.json`) },
@@ -404,7 +406,7 @@ export async function say(ctx, base, opts, out, [target, text, ...extra]) {
     throw new CliError(`could not write the line into ${outDir} (${error?.code ?? error?.message ?? error}); ElevenLabs was already paid for it, so run say again`);
   }
   const duration = line.duration;
-  return out({ line: linePath, audio: audioPath, duration }, `Wrote ${linePath}\n  and ${audioPath} (${duration.toFixed(2)} s).`);
+  return out({ line: linePath, audio: audioPath, duration, play: null, playNote: NO_PLAY_LOCAL }, `Wrote ${linePath}\n  and ${audioPath} (${duration.toFixed(2)} s).`);
 }
 
 /** a catalogue name (GET /lines/voices) as the service takes it; anything else must be an ElevenLabs voice id */
@@ -413,7 +415,7 @@ const CATALOGUE_NAME = /^[a-z]{2,20}$/;
 /** `say --server`: POST /lines/say on the Minimoji key, then the audio it
  *  answered downloaded, written beside the line as the local path writes
  *  them (both files or neither) */
-async function sayOnServer(ctx, base, opts, out, { text, chosen, model, name, outDir }) {
+async function sayOnServer(ctx, base, opts, out, { text, chosen, model, name, outDir, target, avatarKey }) {
   // your ElevenLabs key never goes to our service: --server speaks on Minimoji's voice, so the two don't mix
   if (opts["elevenlabs-key"]) throw new CliError("--server speaks on Minimoji's voice (your Minimoji key's characters); --elevenlabs-key is for the local path: drop one of them");
   const given = chosen.voiceId;
@@ -449,7 +451,29 @@ async function sayOnServer(ctx, base, opts, out, { text, chosen, model, name, ou
     throw new CliError(`could not write the line into ${outDir} (${error?.code ?? error?.message ?? error}); run say --server again (a repeat costs no characters)`);
   }
   const duration = answer.line.duration;
+  const { play, playNote } = await playLink(ctx, base, opts, target, avatarKey, answer.audio);
   // the audio's public URL and the timings too: an agent (minimoji mcp) or a web page needs no file
-  return out({ line: linePath, audio: audioPath, duration, server: true, chars: answer.chars, charged: answer.charged, cached: answer.cached, audioUrl: answer.audio, words: answer.words ?? null, letters: answer.letters ?? null },
-    `Wrote ${linePath}\n  and ${audioPath} (${Number(duration).toFixed(2)} s, ${answer.cached ? "from the cache, no characters" : `${answer.charged} characters of Minimoji's voice`}).`);
+  return out({ line: linePath, audio: audioPath, duration, server: true, chars: answer.chars, charged: answer.charged, cached: answer.cached, audioUrl: answer.audio, words: answer.words ?? null, letters: answer.letters ?? null, play, ...(playNote ? { playNote } : {}) },
+    [`Wrote ${linePath}\n  and ${audioPath} (${Number(duration).toFixed(2)} s, ${answer.cached ? "from the cache, no characters" : `${answer.charged} characters of Minimoji's voice`}).`,
+      play ? `Play it: ${play}` : `No play link: ${playNote}`].join("\n"));
+}
+
+const NO_PLAY_LOCAL = "the line was spoken on your own ElevenLabs key and kept only here; say --server keeps it at Minimoji, with a link that plays it";
+/** a kept line's id from the audio URL POST /lines/say answered (`…/say/<segment>/<name>.wav`; apps/web/lib/preview.ts lineIdFromAudio) */
+export function lineIdFromAudio(audio) {
+  const m = typeof audio === "string" ? /\/say\/([0-9a-f]{32}\/[0-9a-f]{64}-[0-9a-f]{16})\.wav$/.exec(audio) : null;
+  return m ? m[1] : null;
+}
+
+/** the preview page for the avatar speaking the line (`?line=`), or why there is none: the line is paid
+ *  for already, so a link that cannot be made is a note in the answer, never a failed say */
+async function playLink(ctx, base, opts, target, avatarKey, audio) {
+  const line = lineIdFromAudio(audio);
+  if (!line) return { play: null, playNote: "the service kept this line somewhere the preview page does not read" };
+  try {
+    const key = avatarKey ?? await keyFor(ctx, base, target);
+    return { play: await previewFor(ctx, base, { site: opts.site, line }, { avatarKey: key }), playNote: null };
+  } catch (error) {
+    return { play: null, playNote: `the line is kept, but the link could not be made (${String(error?.message ?? error).split("\n")[0]})` };
+  }
 }

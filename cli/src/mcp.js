@@ -140,7 +140,7 @@ export const TOOLS = [
   },
   {
     name: "say",
-    description: `Turn a sentence into a line the avatar speaks: the audio (a public URL and a .wav written here) and the line with its words and letter timings, which every Minimoji SDK player lip-syncs. Spends the text's characters (at most ${MAX_TEXT} a call) of today's 5,000 on Minimoji's voice; saying the same line again is cached and free. voice_source "elevenlabs" speaks on the person's own ElevenLabs account instead, from ELEVENLABS_API_KEY in this server's environment (never a tool argument).`,
+    description: `Turn a sentence into a line the avatar speaks: the audio (a public URL and a .wav written here) and the line with its words and letter timings, which every Minimoji SDK player lip-syncs, and play: a minimoji.com link where the avatar says it with its mouth in sync. Show the person play (it is how they see the head talk); never build a page to stitch the audio and the avatar together. Spends the text's characters (at most ${MAX_TEXT} a call) of today's 5,000 on Minimoji's voice; saying the same line again is cached and free. voice_source "elevenlabs" speaks on the person's own ElevenLabs account instead, from ELEVENLABS_API_KEY in this server's environment (never a tool argument).`,
     inputSchema: schema({
       avatar: AVATAR,
       text: { type: "string", description: `The words, at most ${MAX_TEXT} characters; [tags] like [excited] steer the delivery` },
@@ -327,7 +327,7 @@ const INSTRUCTIONS = [
   "Minimoji makes Mini avatars: small 3D heads that talk with lip-sync, show moods and carry a status into every app that wears them.",
   "This server runs as the terminal signed in with `minimoji login`. If a tool says the terminal is not signed in, ask the person to run `minimoji login` in a terminal; signing in and API keys never go through here.",
   "Each tool's description says what it spends (a generation, characters of speech); tell the person before spending much.",
-  "Typical flow: make_avatar → set_status or say → preview_link to show it. The resources minimoji://skill/web and minimoji://skill/swift are the SDK guides for putting a head in an app.",
+  "Typical flow: make_avatar → say → show the person say's play link, where the avatar speaks the line (preview_link for a still head; set_status for a status). The resources minimoji://skill/web and minimoji://skill/swift are the SDK guides for putting a head in an app.",
 ].join(" ");
 
 /** the answer to one request, or null for a notification */

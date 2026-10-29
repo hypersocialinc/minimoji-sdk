@@ -159,7 +159,8 @@ test("say: one TTS request, a line that passes validateLine, a WAV as long as th
     assert.equal(call.path, `/v1/text-to-speech/${RACHEL}/with-timestamps`);
     assert.equal(call.search, "?output_format=pcm_24000");
     assert.deepEqual(call.body, { text: "[excited] Hi, I'm Billie", model_id: "eleven_v4" });
-    assert.deepEqual(said.json, { line: join(ctx.cwd, "lines/hi-i-m-billie.json"), audio: join(ctx.cwd, "lines/hi-i-m-billie.wav"), duration: said.json.duration });
+    assert.deepEqual(said.json, { line: join(ctx.cwd, "lines/hi-i-m-billie.json"), audio: join(ctx.cwd, "lines/hi-i-m-billie.wav"), duration: said.json.duration, play: null, playNote: said.json.playNote });
+    assert.match(said.json.playNote, /say --server keeps it at Minimoji/, "a line kept only here has no play link, and says how to get one");
 
     const { validateLine, buildLine } = await import(BUNDLE);
     const line = validateLine(JSON.parse(await readFile(said.json.line, "utf8")));
@@ -462,5 +463,60 @@ test("say --server: POST /lines/say on the Minimoji key, the same <name>.wav + <
     const bad = await run(ctx, ["say", "kai", "Hi", "--server", "--voice", "Rachel Green"]);
     assert.equal(bad.code, 1);
     assert.match(bad.stderr, /--server takes a voice id or a name from GET \/lines\/voices/);
+  } finally { await server.close(); }
+});
+
+test("say --server answers play: the preview page speaking the kept line, by key where the site reads it, else by document; never a failed say", async () => {
+  const { buildLine } = await import(BUNDLE);
+  const LINE_ID = `${"c".repeat(32)}/${"d".repeat(64)}-${"e".repeat(16)}`;
+  let origin = null, audioPath = `/say/${LINE_ID}.wav`;
+  const answer = (body) => {
+    const tts = speech(body.text);
+    const line = buildLine({ pcm: pcmFromS16(Buffer.from(tts.audio_base64, "base64")), sampleRate: RATE, words: wordsFromCharacters(tts.alignment), letters: lettersFromCharacters(tts.alignment) });
+    return { audio: `${origin}${audioPath}`, format: "wav", durationMs: Math.round(line.duration * 1000), line, words: [], letters: [], transcript: body.text, chars: body.text.length, charged: 0, cached: true, voice: { name: null, voiceId: RACHEL, effect: "none" } };
+  };
+  const doc = { v: 1, hair: "red curls" };
+  const server = await fixtureServer({
+    "GET /cli/avatars": () => ({ json: { avatars: [{ name: "kai", avatarKey: KAI, kind: "person", createdAt: 1, updatedAt: 1, ttsVoice: { provider: "elevenlabs", voiceId: RACHEL, effect: "none" } }] } }),
+    "POST /lines/say": ({ body }) => ({ json: answer(body) }),
+    "GET /say/*": () => ({ body: wav(new Float32Array(RATE / 2), RATE), headers: { "Content-Type": "audio/wav" } }),
+    [`GET /avatars/${KAI}.json`]: () => ({ json: doc }),
+  });
+  origin = server.url;
+  try {
+    const env = { MINIMOJI_API: server.url, MINIMOJI_KEY: "mk_sec_" + "1".repeat(40) };
+    const ctx = await makeCtx({ env: { ...env, MINIMOJI_SITE: "https://www.minimoji.com" } });
+    await signIn(ctx, server.url);
+    const r = await run(ctx, ["say", "kai", "Hello from space", "--server", "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.equal(r.json.play, `https://www.minimoji.com/preview/${KAI}?line=${LINE_ID}`, "the key in the path, the line's id with its slash");
+    assert.equal(r.json.playNote, undefined);
+    const text = await run(ctx, ["say", "kai", "Hello from space", "--server"]);
+    assert.match(text.stdout, new RegExp(`Play it: https://www\\.minimoji\\.com/preview/${KAI}\\?line=${LINE_ID}`));
+    // --voice skips the entry's voice, and the avatar's key is still read from the library
+    const voiced = await run(ctx, ["say", "kai", "Beep", "--server", "--voice", "dash", "--json"]);
+    assert.equal(voiced.json.play, `https://www.minimoji.com/preview/${KAI}?line=${LINE_ID}`);
+
+    // a deployment the site doesn't read keys from: the document rides the fragment, the line the query
+    const dev = await makeCtx({ env });
+    await signIn(dev, server.url);
+    const fragment = await run(dev, ["say", KAI, "Hi", "--server", "--voice", "dash", "--json"]);
+    const url = new URL(fragment.json.play);
+    assert.equal(url.pathname, "/preview");
+    assert.equal(url.searchParams.get("line"), LINE_ID);
+    assert.deepEqual(JSON.parse(Buffer.from(url.hash.slice("#doc=".length), "base64url").toString()), doc);
+
+    // the service kept it somewhere else: the say still answers, with a note in place of the link
+    audioPath = "/say/o/hi.wav";
+    const elsewhere = await run(ctx, ["say", "kai", "Hi", "--server", "--json"]);
+    assert.equal(elsewhere.code, 0, elsewhere.stderr);
+    assert.equal(elsewhere.json.play, null);
+    assert.match(elsewhere.json.playNote, /does not read/);
+    // an avatar the library doesn't have: kept and answered, the link says why it's missing
+    audioPath = `/say/${LINE_ID}.wav`;
+    const stranger = await run(ctx, ["say", "nobody", "Hi", "--server", "--voice", "dash", "--json"]);
+    assert.equal(stranger.code, 0, stranger.stderr);
+    assert.equal(stranger.json.play, null);
+    assert.match(stranger.json.playNote, /the link could not be made/);
   } finally { await server.close(); }
 });

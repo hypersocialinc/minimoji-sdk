@@ -96,6 +96,7 @@ test("mcp: initialize, tools/list (every tool, a schema and what it spends), res
     assert.match(init.result.serverInfo.version, /^\d+\.\d+\.\d+$/);
     assert.deepEqual(init.result.capabilities, { tools: {}, resources: {} });
     assert.match(init.result.instructions, /minimoji login/);
+    assert.match(init.result.instructions, /make_avatar → say → show the person say.s play link/);
     c.send(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }));
     const older = await c.request("initialize", { protocolVersion: "2025-03-26", capabilities: {} });
     assert.equal(older.result.protocolVersion, "2025-03-26", "an older protocol is spoken as asked");
@@ -112,6 +113,7 @@ test("mcp: initialize, tools/list (every tool, a schema and what it spends), res
     }
     assert.match(tools.find((t) => t.name === "make_avatar").description, /one generation/);
     assert.match(tools.find((t) => t.name === "say").description, /characters/);
+    assert.match(tools.find((t) => t.name === "say").description, /Show the person play/, "the agent is told to show the link that talks");
     assert.ok(!tools.some((t) => /login|logout|keys/.test(t.name)), "signing in and keys stay in the terminal");
 
     const { resources } = (await c.request("resources/list")).result;
@@ -163,6 +165,8 @@ test("mcp: the tools run the commands on the signed-in terminal and answer their
     assert.equal(said.data.line.duration, 0.5);
     assert.equal(said.data.charged, 2);
     assert.equal(said.data.lineFile, join(c.out, "kai-hi.json"), "named for the avatar and the words");
+    assert.equal(said.data.play, null, "the fixture keeps lines where the preview page does not read");
+    assert.match(said.data.playNote, /does not read/, "and the answer says why there is no play link");
     assert.equal((await stat(said.data.audioFile)).isFile(), true);
     assert.deepEqual(c.svc.calls.find((x) => x.path === "/lines/say").body, { text: "Hi", voice: "person", model: "eleven_v4" });
 

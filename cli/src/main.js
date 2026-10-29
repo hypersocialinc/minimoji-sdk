@@ -58,7 +58,7 @@ const COMMANDS = {
   status: { run: status, options: { clear: { type: "boolean" } },
     usage: 'minimoji status <name|key> ["back at 3"] | <name|key> --clear',
     about: "Set the line beside an avatar: every app wearing it (Bunch, savethis, …) shows it, with the mood it reads as. With no text, print it." },
-  say: { run: say, options: { ...KEY, voice: { type: "string" }, mood: { type: "string" }, out: { type: "string" }, name: { type: "string" }, effect: { type: "string" }, settings: { type: "string", multiple: true }, model: { type: "string" }, "dry-run": { type: "boolean" }, "elevenlabs-key": { type: "string" }, server: { type: "boolean" } },
+  say: { run: say, options: { ...KEY, ...SITE, voice: { type: "string" }, mood: { type: "string" }, out: { type: "string" }, name: { type: "string" }, effect: { type: "string" }, settings: { type: "string", multiple: true }, model: { type: "string" }, "dry-run": { type: "boolean" }, "elevenlabs-key": { type: "string" }, server: { type: "boolean" } },
     usage: 'minimoji say <name|key> "Hi, I\'m Billie" [--voice id] [--mood happy] [--out minimoji-lines] [--name hello] [--effect robot|none] [--model eleven_v4] [--server] [--dry-run]',
     about: `Turn a sentence into a line the avatar speaks: one ElevenLabs call on your key (ELEVENLABS_API_KEY), then <name>.wav and <name>.json (lip-sync, captions, moods) that every SDK line player plays. --server speaks it on Minimoji's voice instead (your Minimoji key, 5,000 characters a day, no ElevenLabs key). At most 1000 characters.` },
   lines: { run: lines, options: { ...KEY, text: { type: "string" }, texts: { type: "string" }, out: { type: "string" }, timings: { type: "boolean" }, "dry-run": { type: "boolean" } },

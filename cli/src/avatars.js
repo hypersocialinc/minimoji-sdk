@@ -225,7 +225,9 @@ export function previewURL(ctx, opts, source) {
   const q = new URLSearchParams();
   if (opts.face && opts.face !== "neutral") q.set("face", opts.face);
   if (opts.body) q.set("body", "1");
-  const query = q.size ? `?${q}` : "";
+  if (opts.line) q.set("line", opts.line);
+  // a line's id keeps its slash: a link an agent prints stays legible
+  const query = q.size ? `?${q.toString().replace(/%2F/g, "/")}` : "";
   if (source.avatarKey) return `${site}/preview/${source.avatarKey}${query}`;
   const param = encodeDoc(source.doc);
   if (param.length > MAX_DOC_PARAM) throw new CliError(`this document is too big for a preview link (${Math.ceil(param.length / 1024)} KB of ${MAX_DOC_PARAM / 1024} KB)`);

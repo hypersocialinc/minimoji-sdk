@@ -182,6 +182,11 @@ minimoji say kai "[excited] Hi, I'm Billie"      # minimoji-lines/hi-i-m-billie.
   with the audio beside it: React `useLine().say(line, { audio })`, the
   vanilla bundle's `createLineSession`, `createLinePlayer`, or Swift
   `MinimojiLinePlayer.say(line, audio:)`.
+- **The play link**: `say --server` keeps the line at Minimoji and prints
+  `Play it: https://www.minimoji.com/preview/<key>?line=<id>`, the preview
+  page with the avatar speaking it (lip-sync, captions, one tap for sound).
+  `--json` gives it as `play`. A line said on your own ElevenLabs key is kept
+  only on your disk, so it has no link; `playNote` says why.
 - **The audio** is a 24 kHz 16-bit mono WAV. `say` asks ElevenLabs for raw
   PCM (every tier has 24 kHz), so the CLI decodes it and runs the effect with
   no ffmpeg and no native dependencies. Convert the WAV to mp3 yourself if
@@ -283,7 +288,7 @@ or `~/.cursor/mcp.json` for every project):
 | `edit_avatar` | Change one with words or a photo; `save_as` keeps it as a new entry | one generation |
 | `make_species_avatar` | A species with picks from its kit, kept in the library | nothing |
 | `set_status` | The line beside the avatar in every app wearing it | one status change |
-| `say` | A line on Minimoji's voice: the audio URL, `line`, `words`, `letters`, and the `.wav` + `.json` written here | the text's characters of the day's 5,000 (a repeat is free) |
+| `say` | A line on Minimoji's voice: `play` (a minimoji.com link where the avatar says it), the audio URL, `line`, `words`, `letters`, and the `.wav` + `.json` written here | the text's characters of the day's 5,000 (a repeat is free) |
 | `lines` | A clip you have + its text → a line, with timings | one line build |
 | `render_still` | The still PNG, written here | nothing |
 | `preview_link` | A minimoji.com link that shows it in 3D | nothing |
