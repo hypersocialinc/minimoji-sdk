@@ -27,6 +27,9 @@ const PROTOCOL_VERSIONS = [PROTOCOL_VERSION, "2025-03-26", "2024-11-05"];
 /** what make_avatar may spend in one call: the CLI's --count goes to 10, an agent's to 3 */
 export const MAX_MCP_COUNT = 3;
 
+// the moods whose faces pop comic stickers in every Minimoji player (the Kit's EmoteBurst, @minimoji/react's
+// comic-bursts.js), named in say's description; apps/web/test/mcp-parity.test.mjs holds it to the SDK's list
+export const STICKER_MOODS = ["happy", "joy", "laugh", "smug", "sad", "crying", "worried", "angry", "furious", "surprised", "scared", "thinking", "sleeping", "dead"];
 const RPC = { parse: -32700, invalidRequest: -32600, noMethod: -32601, invalidParams: -32602, internal: -32603, noResource: -32002 };
 
 // ─── the tools ──────────────────────────────────────────────────────────────
@@ -140,7 +143,7 @@ export const TOOLS = [
   },
   {
     name: "say",
-    description: `Turn a sentence into a line the avatar speaks: the audio (a public URL and a .wav written here) and the line with its words and letter timings, which every Minimoji SDK player lip-syncs, and play: a minimoji.com link where the avatar says it with its mouth in sync. Show the person play (it is how they see the head talk); never build a page to stitch the audio and the avatar together. Spends the text's characters (at most ${MAX_TEXT} a call) of today's 5,000 on Minimoji's voice; saying the same line again is cached and free. voice_source "elevenlabs" speaks on the person's own ElevenLabs account instead, from ELEVENLABS_API_KEY in this server's environment (never a tool argument).`,
+    description: `Turn a sentence into a line the avatar speaks: the audio (a public URL and a .wav written here) and the line with its words and letter timings, which every Minimoji SDK player lip-syncs, and play: a minimoji.com link where the avatar says it with its mouth in sync. Show the person play (it is how they see the head talk); never build a page to stitch the audio and the avatar together. Its face takes the line's mood, and these moods pop comic stickers around the head on their own, with no tag or setting: ${STICKER_MOODS.join(", ")} (neutral has none). Spends the text's characters (at most ${MAX_TEXT} a call) of today's 5,000 on Minimoji's voice; saying the same line again is cached and free. voice_source "elevenlabs" speaks on the person's own ElevenLabs account instead, from ELEVENLABS_API_KEY in this server's environment (never a tool argument).`,
     inputSchema: schema({
       avatar: AVATAR,
       text: { type: "string", description: `The words, at most ${MAX_TEXT} characters; [tags] like [excited] steer the delivery` },

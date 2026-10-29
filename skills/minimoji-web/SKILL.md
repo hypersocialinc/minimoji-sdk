@@ -642,6 +642,17 @@ export function Reacting({ avatar }: { avatar: AvatarInput }) {
   `laugh`, `sad`, `angry`, `furious`, `surprised`, `worried`, `scared`,
   `dead`, `smug`, `sleeping`, `crying`, `thinking`). A change plays the
   mood's emote unless `emotes={false}`.
+- **Stickers**: a change to a mood also pops its comic stickers around the
+  head (a "!" for `surprised`, sweat for `worried`, flames for `angry`,
+  hearts for `happy`…), as MinimojiKit does. On by default; `bursts={false}`
+  turns them off, and reduced motion shows none. Every mood above has them
+  but `neutral`/`idle`. They fire on a CHANGE: never the first face, never
+  the same face twice in a row, and at any strength (a line's quiet 0.3 cue
+  pops them too); a change to `neutral` lets them fade, and so does the end
+  of a line. Nothing to wire: a line's mood cues reach `expression`, so
+  `useLine` lines pop them at each cue. The PNGs load from
+  `https://www.minimoji.com/emote-bursts/` (allow it in `img-src`), or
+  `<MinimojiStage burstBase="/your/copy/">`.
 - `cue={{ gesture }}` plays one named track over the face as it is (the
   face never changes): `double-take`, `head-shake`, `sunny-nod`,
   `knowing-nod`, `ponder-tilt`, `side-eye-hmm`, `lightbulb`, … (the
