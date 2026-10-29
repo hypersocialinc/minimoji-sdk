@@ -253,7 +253,10 @@ https://www.minimoji.com/mcp
 
 then sign in with your Minimoji account. The tools below work as you, minus
 `lines`; a photo is one you attach in the chat, and `say` and `render_still`
-answer URLs instead of writing files. `minimoji mcp` stays for local agents
+answer URLs instead of writing files. Where the chat shows MCP Apps (Claude
+on the web and Desktop), `say`, `make_avatar` and `preview_link` show the
+head right in the reply, and a tap on Play makes it talk; elsewhere the
+answer's links do. `minimoji mcp` stays for local agents
 (Claude Code, Cursor) and for files written next to your code.
 
 ## Use it from an agent (MCP)
