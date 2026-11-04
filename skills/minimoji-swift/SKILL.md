@@ -340,6 +340,10 @@ cue = HeadCue(.forMood("laugh"), generation: cues)       // one of laugh's three
   plays no emote of its own (and does not cut your cue short), cues still
   play. Do not pass `performances: false` for that: it silences cues too.
   `bursts: false` drops only the stickers that pop on a mood change.
+- A face you set for bookkeeping (a mood lapsing back to neutral, a mute, a
+  reset)? Pass `emotes: false` with that `expression` on the same update,
+  and `emotes: true` with a face the person picks. It is read per change, so
+  the lapse plays no emote; cues still play.
 - D.A.S.H.'s screen shows the mood on the whole glass (LEDs, glow and glass
   in the mood's colour; neutral is the theme's own) and its eyes change shape
   for sad, angry and surprised/scared: `expression` drives it, nothing to wire.

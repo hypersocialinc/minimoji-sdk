@@ -363,7 +363,7 @@ export function DashSaysHey() {
   `mountHeadPerformance` and `createVoicedPerformance`, whose
   `select({ audio, transcript })` takes the same plain clip, plus
   `createLineSession` (this hook without React) and `createClipCache`.
-- **`emotes={false}` on a talking head**, set once: the line's strong mood
+- **`emotes={false}` on a talking head**, for the whole line: the line's strong mood
   cues emote through `cue`, quiet ones (k under 0.35) only change
   `expression`, gestures play through `cue`. `expression` is null between
   lines, so yours applies.
@@ -751,6 +751,13 @@ export function Reacting({ avatar }: { avatar: AvatarInput }) {
 - `performances={false}` stills every one-shot, cues included (reduced
   motion). To cue your own gestures over a beat, pass `emotes={false}`,
   not `performances={false}`.
+- **A face you set for bookkeeping** (a mood lapsing back to neutral, a
+  mute, a reset) goes with `emotes={false}` in the same render; a face the
+  person picked goes with `emotes={true}`. `emotes` is live, never a
+  rebuild, and is read on the next `expression` change, so the lapse changes
+  the face with no emote. Cues still play, and one already
+  playing plays on. Stickers are `bursts`'s: a lapse to `neutral` pops none;
+  to a mood that has one, pass `bursts={false}` on the same render.
 - A mood from text: `POST <service>/expressions/pick` with
   `{ text, gesture: true }` answers `expression` (null: keep the face) and
   a `gesture`. Ask on a typing pause, never per keystroke.
@@ -859,9 +866,8 @@ the Swift Kit's `MinimojiBody`, or ask Minimoji.
 - Respect `prefers-reduced-motion`: pass `drift={false}`,
   `performances={false}` and `look={null}` (the homepage does). The
   package already drops natural motion and screen effects under it.
-- A changed `emotes`, `performances`, `naturalTalk`, `drift` or `character`
-  rebuilds the head:
-  set them once, not per frame. A changed `avatar` whirls the new head in.
+- A changed `performances`, `naturalTalk`, `drift` or `character` rebuilds
+  the head: set them once, not per frame. `emotes` is live (no rebuild). A changed `avatar` whirls the new head in.
 - One voice at a time: stop the other heads' audio when one starts.
 
 ## 9. Keys
