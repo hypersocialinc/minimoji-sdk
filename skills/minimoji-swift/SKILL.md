@@ -315,6 +315,28 @@ MinimojiEditorView(service: service, doc: $newDraft, head: $newHead,
 - The editor never saves. Persistence, and the `POST /avatars` through your
   backend, are yours.
 
+**On the Mac** (macOS 15, a SwiftUI/AppKit app; not Catalyst) the same
+`MinimojiEditorView` calls work, `creatingAvatar: true` included. Present it
+in a `.sheet` with a size floor (`.frame(minWidth: 560, minHeight: 720)`):
+a Mac sheet has no detents. What differs:
+
+- **Selfie = a file or a drag-in** (not the Photos picker; drag from Photos
+  instead): "Import from selfie…" (and the camera's Choose a File) open a file picker
+  for images, and a picture dragged from Finder, Photos or a browser onto the
+  stage is sent the same way. A sandboxed host needs
+  `com.apple.security.files.user-selected.read-only`.
+- **The camera** is the FaceTime camera on the stage, no flip button. It
+  needs `NSCameraUsageDescription` and, sandboxed,
+  `com.apple.security.device.camera`; without the usage string the camera
+  button opens the file picker.
+- **Dictation is off**: no mic button, no microphone or speech prompt.
+- **No haptics.** `toolsInToolbar` is ignored: the ⋯ menu stays on the stage
+  (a Mac sheet has no navigation bar). Bring your own Cancel/Save and hide
+  them while `proposalOpen` is true, as on the phone.
+- Describe it / describe a change send exactly as on the phone. Attach the
+  device engine (`LocalBaker`, JavaScriptCore on the Mac) for instant part
+  previews. A runnable sample is `apps/mac-editor-sample` in the Minimoji repo.
+
 ## 6. Cue a gesture
 
 ```swift
