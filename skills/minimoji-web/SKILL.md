@@ -228,13 +228,17 @@ export function DashSaysHey() {
   `say({ audio, words, alignment: tts.alignment })`, or as `letters`
   (`[{ text, start, end }]`, one character each with the spaces, seconds;
   `lettersFromAlignment` from `@minimoji/react` builds them). Words only (a
-  transcriber's) spread into letters with `lettersFromWords`. Without letters the mouth is guessed from the audio, as
-  before. A URL that serves new audio
+  transcriber's) spread into letters on their own: a clip with `words` and no
+  `letters` or `alignment` gets `lettersFromWords(words)` by default
+  (`letters: false` opts out, the mouth guessed from the audio). A direct
+  `buildLine` call does not do this: pass `letters: lettersFromWords(words)`
+  yourself. Captions ending a few ms past the audio (a provider's timestamps
+  often do) end with it instead of failing the clip. A URL that serves new audio
   each time needs a fresh URL per clip, or pass the `Blob`.
 - **Any voice, not only ElevenLabs.** Every provider's timings become our
   words (`[{ text, start, end }]`, seconds) with a small reader from
   `@minimoji/react` (also in `/sdk/minimoji-heads.js`); then
-  `say({ audio, words, letters: lettersFromWords(words) })`:
+  `say({ audio, words })` (the words spread into letters by default):
 
   | Provider | What it gives | Reader |
   |---|---|---|
@@ -243,7 +247,7 @@ export function DashSaysHey() {
   | Azure Speech | WordBoundary events: `text`, `audioOffset` + `duration` in 100 ns ticks | `wordsFromAzure(events)` (punctuation boundaries skipped) |
   | Amazon Polly | speech marks: JSON lines `{ time (ms), type: "word", value }` | `wordsFromPolly(marks, clipSeconds)` (a word ends where the next starts; a cut-off line throws) |
   | Cartesia | `word_timestamps: { words, start, end }` (seconds) | `wordsFromCartesia(word_timestamps)` (one or a stream's pieces) |
-  | Dictation, Scribe | words only | `lettersFromWords(words)` |
+  | Dictation, Scribe | words only | `words` (spread by `lettersFromWords` by default) |
   | OpenAI TTS, any voice with no timings, a human take | nothing | `say({ audio, transcript: 'what it says', transcribe: true })`: the service aligns the text to the audio |
 
   Spread letters are an estimate (the lips still meet inside the right
@@ -363,6 +367,10 @@ export function DashSaysHey() {
   `mountHeadPerformance` and `createVoicedPerformance`, whose
   `select({ audio, transcript })` takes the same plain clip, plus
   `createLineSession` (this hook without React) and `createClipCache`.
+  `createVoicedPerformance({ ..., muted, volume })` and its `setMuted(m)` /
+  `setVolume(v)` hold a sound-off narrator across stop, replay and the next
+  clip (every run makes a fresh element); the head still talks on a muted
+  element. Unset, the element stays as your `createMedia` made it.
 - **`emotes={false}` on a talking head**, for the whole line: the line's strong mood
   cues emote through `cue`, quiet ones (k under 0.35) only change
   `expression`, gestures play through `cue`. `expression` is null between
