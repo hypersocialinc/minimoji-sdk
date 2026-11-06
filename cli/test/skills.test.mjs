@@ -163,3 +163,39 @@ test("a failed download leaves the installed skill whole; a folder minimoji did 
     assert.equal(await readFile(join(ctx.cwd, ".claude/skills/minimoji-swift/SKILL.md"), "utf8"), "hand written");
   } finally { await broken.close(); }
 });
+
+test("a folder skill (minimoji-presenter) installs whole: skills list shows it, add writes every starter file, binary too", async () => {
+  const wav = Buffer.from([0x52, 0x49, 0x46, 0x46, 0, 0xff, 0x80, 1]);
+  const files = {
+    "skills/minimoji-swift/SKILL.md": SKILL("new"),
+    "skills/minimoji-web/SKILL.md": SKILL("new").replace("minimoji-swift", "minimoji-web"),
+    "skills/minimoji-presenter/SKILL.md": "---\nname: minimoji-presenter\ndescription: A deck a Mini avatar presents.\n---\n\n# minimoji-presenter\n",
+    "skills/minimoji-presenter/starter/presenter.js": "export async function startPresenter() {}\n",
+    "skills/minimoji-presenter/starter/slides.json": '{ "slides": [] }\n',
+    "skills/minimoji-presenter/starter/lines/slide0.wav": wav,
+    "skills/minimoji-presenter/scripts/make-lines.sh": "#!/usr/bin/env bash\n",
+  };
+  const svc = await fixtureServer({
+    [`GET /repos/${SKILLS_REPO}/commits/main`]: () => ({ body: NEW, headers: { "Content-Type": "text/plain" } }),
+    [`GET /repos/${SKILLS_REPO}/git/trees/*`]: () => ({ json: { tree: Object.keys(files).map((path) => ({ path, type: "blob" })) } }),
+    [`GET /${SKILLS_REPO}/*`]: (c) => {
+      const path = c.path.split("/").slice(4).join("/");
+      return files[path] != null ? { body: files[path] } : { status: 404, body: "404" };
+    },
+  });
+  try {
+    const ctx = await ctxFor(svc, [".claude/"]);
+    const list = await run(ctx, ["skills", "list", "--json"]);
+    assert.deepEqual(list.json.skills.map((s) => s.name).sort(), ["minimoji-presenter", "minimoji-swift", "minimoji-web"]);
+    const one = await run(ctx, ["skills", "add", "minimoji-presenter", "--json"]);
+    assert.equal(one.code, 0, one.stderr);
+    const dir = join(ctx.cwd, ".claude/skills/minimoji-presenter");
+    for (const [path, body] of Object.entries(files)) {
+      if (!path.startsWith("skills/minimoji-presenter/") || path.endsWith("SKILL.md")) continue;
+      assert.ok((await readFile(join(dir, path.replace("skills/minimoji-presenter/", "")))).equals(Buffer.from(body)), path);
+    }
+    assert.match(await readFile(join(dir, "SKILL.md"), "utf8"), new RegExp(`minimoji-source: ${SKILLS_REPO}@${NEW}`));
+    const all = await run(ctx, ["skills", "add", "--json"]);
+    assert.deepEqual(all.json.installed.map((s) => s.name).sort(), ["minimoji-presenter", "minimoji-swift", "minimoji-web"], "no name installs all three");
+  } finally { await svc.close(); }
+});

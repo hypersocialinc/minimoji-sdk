@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, readdir, stat, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -519,4 +520,164 @@ test("say --server answers play: the preview page speaking the kept line, by key
     assert.equal(stranger.json.play, null);
     assert.match(stranger.json.playNote, /the link could not be made/);
   } finally { await server.close(); }
+});
+
+// ─── say --texts: a presenter deck ─────────────────────────────────────────
+
+const MK = "mk_sec_" + "k".repeat(40);
+const SIX = ["Hi, I'm Dash.", "Save anything you love.", "I file it in the right pile.", "All of it is open to your assistants.", "Swipe through them to react.", "A passport for your taste."];
+const deckOf = (says, extra = {}) => ({ voice: { provider: "elevenlabs", voiceId: RACHEL, model: "eleven_v4" }, holdMs: 250, slides: says.map((say, n) => ({ id: `s${n}`, say, mood: n === 5 ? "joy" : "happy" })), ...extra });
+
+/** ElevenLabs, POST /lines and the site on one fixture, with a fake clock the CLI's sleeps advance; `lines` is
+ *  the answers to POST /lines in order (the last repeats), a status for a refusal */
+async function deckWorld({ lines = [200], elevenStatus = 200 } = {}) {
+  const clock = { now: 1_000_000 }, slept = [], log = [];
+  let n = 0;
+  const svc = await fixtureServer({
+    "POST /v1/text-to-speech/*": ({ body }) => {
+      log.push({ what: "tts", text: body.text, at: clock.now });
+      return elevenStatus === 200 ? { json: speech(body.text) } : { status: elevenStatus, json: { detail: { message: `Invalid API key: ${SECRET}` } } };
+    },
+    "POST /lines": async ({ bytes, headers, auth, search }) => {
+      const form = await new Response(bytes, { headers: { "content-type": headers["content-type"] } }).formData();
+      const answer = lines[Math.min(n++, lines.length - 1)];
+      log.push({ what: "lines", text: form.get("text"), mood: new URLSearchParams(search).get("mood"), auth, at: clock.now, status: answer.status ?? 200 });
+      if (answer.status) return { status: answer.status, json: { error: "rate limit for lines reached", retryAfterMs: answer.retryAfterMs } };
+      return { json: { line: { version: 1, fps: 60, duration: 1, frames: [], captions: [{ text: form.get("text"), start: 0, end: 1 }], words: [], cues: [], aligned: true }, words: [{ text: "x", start: 0, end: 1 }], letters: [], transcript: form.get("text"), alignedTo: "text" } };
+    },
+    "GET /sdk/minimoji-heads.js": async () => ({ body: await readFile(BUNDLE), headers: { "Content-Type": "application/javascript" } }),
+  });
+  const ctx = await makeCtx({ env: { MINIMOJI_API: svc.url, ELEVENLABS_API_KEY: SECRET, MINIMOJI_KEY: MK } });
+  Object.assign(ctx, { elevenlabsAPI: svc.url, headsURL: `${svc.url}/sdk/minimoji-heads.js`, now: () => clock.now, sleep: async (ms) => { slept.push(ms); clock.now += ms; } });
+  const writeDeck = (deck) => writeFile(join(ctx.cwd, "slides.json"), JSON.stringify(deck));
+  return { svc, ctx, log, slept, writeDeck };
+}
+
+test("say --texts: a 6-slide deck is said and re-timed slide by slide, /lines at least 3 s apart, the files and the manifest written", async () => {
+  const { svc, ctx, log, writeDeck } = await deckWorld();
+  try {
+    await writeDeck(deckOf(SIX));
+    const r = await run(ctx, ["say", "--texts", "slides.json", "--out", "lines", "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.deepEqual(log.map((c) => `${c.what}:${c.text}`), SIX.flatMap((say) => [`tts:${say}`, `lines:${say}`]), "one TTS then one /lines per slide, in order");
+    const at = log.filter((c) => c.what === "lines").map((c) => c.at);
+    for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3000, `/lines calls ${i - 1}→${i} were ${at[i] - at[i - 1]} ms apart`);
+    assert.ok(log.filter((c) => c.what === "lines").every((c) => c.auth === `Bearer ${MK}` && (c.mood === "happy" || c.mood === "joy")), "re-timed on the Minimoji key, with the slide's mood");
+    const dir = join(ctx.cwd, "lines");
+    for (let i = 0; i < 6; i++) {
+      assert.ok(existsSync(join(dir, `slide${i}.wav`)), `slide${i}.wav`);
+      assert.equal(JSON.parse(await readFile(join(dir, `slide${i}.json`), "utf8")).aligned, true, "the line on disk is the re-timed one");
+    }
+    const manifest = JSON.parse(await readFile(join(dir, "manifest.json"), "utf8"));
+    assert.equal(manifest.version, 1);
+    assert.deepEqual(manifest.lines.slide0, { textSha256: createHash("sha256").update(SIX[0]).digest("hex"), voice: RACHEL, model: "eleven_v4", mood: "happy", effect: "none", retimed: true });
+    assert.deepEqual(r.json.lines.map((l) => l.status), Array(6).fill("written"));
+    assert.ok(!r.stdout.includes(SECRET) && !r.stderr.includes(SECRET));
+  } finally { await svc.close(); }
+});
+
+test("say --texts: a short 429 on /lines waits its retryAfterMs and retries the same clip", async () => {
+  const { svc, ctx, log, slept, writeDeck } = await deckWorld({ lines: [{}, { status: 429, retryAfterMs: 4000 }, {}] });
+  try {
+    await writeDeck(deckOf(SIX));
+    const r = await run(ctx, ["say", "--texts", "slides.json", "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    const calls = log.filter((c) => c.what === "lines");
+    assert.equal(calls.length, 7);
+    assert.deepEqual([calls[1].text, calls[1].status, calls[2].text, calls[2].status], [SIX[1], 429, SIX[1], 200], "the same clip, sent again");
+    assert.ok(slept.includes(4000), "waited the 4 s the 429 asked for");
+    assert.ok(calls[2].at - calls[1].at >= 4000);
+    assert.deepEqual(r.json.lines.map((l) => l.status), Array(6).fill("written"));
+  } finally { await svc.close(); }
+});
+
+test("say --texts: a day-long 429 stops the run and says what was written; re-run, only what is left is sent", async () => {
+  const { svc, ctx, log, writeDeck } = await deckWorld({ lines: [{}, {}, { status: 429, retryAfterMs: 3_600_000 }, {}] });
+  try {
+    await writeDeck(deckOf(SIX));
+    const r = await run(ctx, ["say", "--texts", "slides.json", "--json"]);
+    assert.equal(r.code, 1);
+    assert.deepEqual(r.json.lines.map((l) => l.status), ["written", "written", "not re-timed", "not sent", "not sent", "not sent"]);
+    assert.match(r.json.stopped, /429/);
+    assert.match(r.stderr, /rate limit for lines reached/);
+    assert.equal(log.filter((c) => c.what === "tts").length, 3, "nothing said after the stop");
+    log.length = 0;
+    const again = await run(ctx, ["say", "--texts", "slides.json", "--json"]);
+    assert.equal(again.code, 0, again.stderr);
+    assert.deepEqual(log.map((c) => `${c.what}:${c.text}`), [`lines:${SIX[2]}`, ...SIX.slice(3).flatMap((say) => [`tts:${say}`, `lines:${say}`])], "slide 2 only re-timed, not said again");
+  } finally { await svc.close(); }
+});
+
+test("say --texts: unchanged, nothing is sent; one say edited, exactly one TTS and one /lines", async () => {
+  const { svc, ctx, log, writeDeck } = await deckWorld();
+  try {
+    await writeDeck(deckOf(SIX));
+    assert.equal((await run(ctx, ["say", "--texts", "slides.json"])).code, 0);
+    log.length = 0;
+    const same = await run(ctx, ["say", "--texts", "slides.json", "--json"]);
+    assert.equal(same.code, 0, same.stderr);
+    assert.equal(log.length, 0);
+    assert.deepEqual(same.json.lines.map((l) => l.status), Array(6).fill("unchanged"));
+    const edited = [...SIX]; edited[3] = "All of it is open to every assistant you use.";
+    await writeDeck(deckOf(edited));
+    const one = await run(ctx, ["say", "--texts", "slides.json", "--json"]);
+    assert.equal(one.code, 0, one.stderr);
+    assert.deepEqual(log.map((c) => `${c.what}:${c.text}`), [`tts:${edited[3]}`, `lines:${edited[3]}`]);
+    const dry = await run(ctx, ["say", "--texts", "slides.json", "--voice", BRIAN, "--dry-run", "--json"]);
+    assert.equal(dry.json.lines.filter((l) => l.status === "would say and re-time").length, 6, "another voice is another line");
+    assert.equal(log.length, 2, "a dry run sends nothing");
+    const tuned = await run(ctx, ["say", "--texts", "slides.json", "--settings", "stability=0.4", "--dry-run", "--json"]);
+    assert.equal(tuned.json.lines.filter((l) => l.status === "would say and re-time").length, 6, "other voice settings are other audio");
+    const server = await run(ctx, ["say", "--texts", "slides.json", "--server", "--dry-run", "--json"]);
+    assert.equal(server.json.lines.filter((l) => l.status === "would say and re-time").length, 6, "Minimoji's voice is not the same audio as your key's");
+  } finally { await svc.close(); }
+});
+
+test("say --texts --no-retime: no /lines call; a later full run only re-times", async () => {
+  const { svc, ctx, log, writeDeck } = await deckWorld();
+  try {
+    await writeDeck(deckOf(SIX.slice(0, 2)));
+    const r = await run(ctx, ["say", "--texts", "slides.json", "--no-retime", "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.deepEqual(log.map((c) => c.what), ["tts", "tts"]);
+    log.length = 0;
+    assert.equal((await run(ctx, ["say", "--texts", "slides.json"])).code, 0);
+    assert.deepEqual(log.map((c) => c.what), ["lines", "lines"]);
+  } finally { await svc.close(); }
+});
+
+test("say --texts: a slide that waits for the viewer has its nudge said and re-timed right after it, cached as slide<N>-nudge", async () => {
+  const { svc, ctx, log, writeDeck } = await deckWorld();
+  try {
+    const deck = deckOf(SIX.slice(0, 2));
+    deck.slides[0].wait = { for: "tap", prompt: "Tap the card", nudge: "Go on, tap it.", nudgeAfterMs: 8000 };
+    await writeDeck(deck);
+    const r = await run(ctx, ["say", "--texts", "slides.json", "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.deepEqual(log.map((c) => `${c.what}:${c.text}`), [`tts:${SIX[0]}`, `lines:${SIX[0]}`, "tts:Go on, tap it.", "lines:Go on, tap it.", `tts:${SIX[1]}`, `lines:${SIX[1]}`]);
+    assert.ok(log.every((c) => c.text !== "Tap the card"), "the prompt is shown, never said");
+    const dir = join(ctx.cwd, "lines");
+    assert.ok(existsSync(join(dir, "slide0-nudge.wav")) && existsSync(join(dir, "slide0-nudge.json")));
+    assert.equal(JSON.parse(await readFile(join(dir, "manifest.json"), "utf8")).lines["slide0-nudge"].textSha256, createHash("sha256").update("Go on, tap it.").digest("hex"));
+  } finally { await svc.close(); }
+});
+
+test("say --texts: an ElevenLabs refusal that echoes the key stops the deck and never prints it; a deck is checked before any call", async () => {
+  const { svc, ctx, log, writeDeck } = await deckWorld({ elevenStatus: 401 });
+  try {
+    await writeDeck(deckOf(SIX));
+    const r = await run(ctx, ["say", "--texts", "slides.json", "--json"]);
+    assert.equal(r.code, 1);
+    assert.equal(log.length, 1, "stopped on the first refusal");
+    assert.deepEqual(r.json.lines.map((l) => l.status), ["failed", ...Array(5).fill("not sent")]);
+    assert.ok(!r.stdout.includes(SECRET) && !r.stderr.includes(SECRET), "the key is never printed");
+    await writeDeck({ slides: [{ say: "ok" }, { say: "" }] });
+    const empty = await run(ctx, ["say", "--texts", "slides.json", "--voice", RACHEL]);
+    assert.equal(empty.code, 1);
+    assert.match(empty.stderr, /slide 1 has nothing to say/);
+    await writeDeck({ slides: [{ say: "No voice anywhere." }] });
+    assert.match((await run(ctx, ["say", "--texts", "slides.json"])).stderr, /needs a voice/);
+    assert.match((await run(ctx, ["say", "kai", "Hi", "--texts", "slides.json"])).stderr, /no text/);
+    assert.equal(log.length, 1);
+  } finally { await svc.close(); }
 });

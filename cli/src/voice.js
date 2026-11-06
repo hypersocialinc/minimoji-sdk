@@ -25,6 +25,7 @@ import { CliError, call, keyedCall, sessionCall } from "./service.js";
 import { AVATAR_KEY, keyFor, listLibrary, resolveTarget, slugify } from "./library.js";
 import { previewFor } from "./avatars.js";
 import { table } from "./auth.js";
+import { LINES_PACE_MS, lineForClip, pacer } from "./lines.js";
 
 export const ELEVENLABS_API = "https://api.elevenlabs.io";
 export const HEADS_URL = "https://www.minimoji.com/sdk/minimoji-heads.js";
@@ -332,6 +333,8 @@ export async function voice(ctx, base, opts, out, [target, given, ...extra]) {
 export const lineName = (text) => slugify(text.replace(/\[[^\]]*\]/g, " ")) ?? "line";
 
 export async function say(ctx, base, opts, out, [target, text, ...extra]) {
+  if (opts.texts != null) return sayDeck(ctx, base, opts, out, [target, text, ...extra].filter((a) => a != null));
+  if (opts["no-retime"]) throw new CliError("--no-retime goes with --texts (a deck); one say is never re-timed");
   if (!target || text == null) throw new CliError('say needs an avatar and the words: minimoji say kai "Hi, I\'m Billie"');
   if (extra.length) throw new CliError("say takes one text; put it in quotes");
   if (!text.trim()) throw new CliError("say needs some words");
@@ -374,6 +377,14 @@ export async function say(ctx, base, opts, out, [target, text, ...extra]) {
     throw new CliError(`can't write lines into ${outDir} (${error?.code ?? error?.message ?? error})`);
   }
 
+  const { line, linePath, audioPath } = await speakLocal(ctx, { key, voiceId, chosen, model, text, mood: opts.mood ?? null, name, outDir, buildLine, validateLine });
+  const duration = line.duration;
+  return out({ line: linePath, audio: audioPath, duration, play: null, playNote: NO_PLAY_LOCAL }, `Wrote ${linePath}\n  and ${audioPath} (${duration.toFixed(2)} s).`);
+}
+
+/** one ElevenLabs call on the person's key, the effect, buildLine, and `<name>.wav` + `<name>.json` written
+ *  (both or neither) */
+async function speakLocal(ctx, { key, voiceId, chosen, model, text, mood, name, outDir, buildLine, validateLine }) {
   const tts = await eleven(ctx, key, "POST", `/v1/text-to-speech/${encodeURIComponent(voiceId)}/with-timestamps?output_format=${OUTPUT_FORMAT}`,
     { text, model_id: model, ...(chosen.settings ? { voice_settings: chosen.settings } : {}) });
   if (typeof tts.audio_base64 !== "string" || !tts.audio_base64) throw new CliError("ElevenLabs returned no audio");
@@ -391,7 +402,7 @@ export async function say(ctx, base, opts, out, [target, text, ...extra]) {
   }
   let line;
   try {
-    line = validateLine(buildLine({ pcm, sampleRate: SAMPLE_RATE, words: wordsFromCharacters(alignment), letters: lettersFromCharacters(alignment), ...(opts.mood ? { mood: opts.mood } : {}) }));
+    line = validateLine(buildLine({ pcm, sampleRate: SAMPLE_RATE, words: wordsFromCharacters(alignment), letters: lettersFromCharacters(alignment), ...(mood ? { mood } : {}) }));
   } catch (error) {
     throw new CliError(`could not build the line (${String(error?.message ?? error).split("\n")[0]})`);
   }
@@ -405,12 +416,19 @@ export async function say(ctx, base, opts, out, [target, text, ...extra]) {
     await Promise.all(pending.map(([, tmp]) => rm(tmp, { force: true })));
     throw new CliError(`could not write the line into ${outDir} (${error?.code ?? error?.message ?? error}); ElevenLabs was already paid for it, so run say again`);
   }
-  const duration = line.duration;
-  return out({ line: linePath, audio: audioPath, duration, play: null, playNote: NO_PLAY_LOCAL }, `Wrote ${linePath}\n  and ${audioPath} (${duration.toFixed(2)} s).`);
+  return { line, linePath, audioPath };
 }
 
 /** a catalogue name (GET /lines/voices) as the service takes it; anything else must be an ElevenLabs voice id */
 const CATALOGUE_NAME = /^[a-z]{2,20}$/;
+
+/** the voice POST /lines/say takes: a catalogue name as it is (when `byName`), else an ElevenLabs voice id */
+function serverVoice(chosen, byName) {
+  const given = chosen.voiceId;
+  if (byName && CATALOGUE_NAME.test(given)) return given;
+  if (ELEVEN_ID.test(given)) return { voiceId: given, effect: chosen.effect, ...(chosen.settings ? { settings: chosen.settings } : {}) };
+  throw new CliError(`--server takes a voice id or a name from GET /lines/voices (dash, person, alien…), not "${given.slice(0, 40)}"`);
+}
 
 /** `say --server`: POST /lines/say on the Minimoji key, then the audio it
  *  answered downloaded, written beside the line as the local path writes
@@ -418,11 +436,7 @@ const CATALOGUE_NAME = /^[a-z]{2,20}$/;
 async function sayOnServer(ctx, base, opts, out, { text, chosen, model, name, outDir, target, avatarKey }) {
   // your ElevenLabs key never goes to our service: --server speaks on Minimoji's voice, so the two don't mix
   if (opts["elevenlabs-key"]) throw new CliError("--server speaks on Minimoji's voice (your Minimoji key's characters); --elevenlabs-key is for the local path: drop one of them");
-  const given = chosen.voiceId;
-  let voice;
-  if (opts.voice && CATALOGUE_NAME.test(given) && !opts.effect && !opts.settings) voice = given;
-  else if (ELEVEN_ID.test(given)) voice = { voiceId: given, effect: chosen.effect, ...(chosen.settings ? { settings: chosen.settings } : {}) };
-  else throw new CliError(`--server takes a voice id or a name from GET /lines/voices (dash, person, alien…), not "${given.slice(0, 40)}"`);
+  const voice = serverVoice(chosen, !!opts.voice && !opts.effect && !opts.settings);
   const body = { text, voice, model, ...(opts.mood ? { mood: opts.mood } : {}) };
   if (opts["dry-run"]) {
     return out({ dryRun: true, server: true, ...body, characters: text.length, out: join(outDir, `${name}.json`) },
@@ -431,7 +445,19 @@ async function sayOnServer(ctx, base, opts, out, { text, chosen, model, name, ou
   try { await mkdir(outDir, { recursive: true }); } catch (error) {
     throw new CliError(`can't write lines into ${outDir} (${error?.code ?? error?.message ?? error})`);
   }
-  const answer = await keyedCall(ctx, base, opts, "POST", "/lines/say", body);
+  const { answer, linePath, audioPath } = await speakServer(ctx, base, opts, { body, name, outDir });
+  const duration = answer.line.duration;
+  const { play, playNote } = await playLink(ctx, base, opts, target, avatarKey, answer.audio);
+  // the audio's public URL and the timings too: an agent (minimoji mcp) or a web page needs no file
+  return out({ line: linePath, audio: audioPath, duration, server: true, chars: answer.chars, charged: answer.charged, cached: answer.cached, audioUrl: answer.audio, words: answer.words ?? null, letters: answer.letters ?? null, play, ...(playNote ? { playNote } : {}) },
+    [`Wrote ${linePath}\n  and ${audioPath} (${Number(duration).toFixed(2)} s, ${answer.cached ? "from the cache, no characters" : `${answer.charged} characters of Minimoji's voice`}).`,
+      play ? `Play it: ${play}` : `No play link: ${playNote}`].join("\n"));
+}
+
+/** POST /lines/say on the Minimoji key (through `pace`), then the audio it answered downloaded and written
+ *  beside the line (both files or neither) */
+async function speakServer(ctx, base, opts, { body, name, outDir, pace = null }) {
+  const answer = await (pace ?? ((f) => f()))(() => keyedCall(ctx, base, opts, "POST", "/lines/say", body));
   if (typeof answer?.audio !== "string" || !/^https?:\/\//.test(answer.audio) || !answer.line) throw new CliError("POST /lines/say answered without audio or a line");
   let bytes;
   try {
@@ -450,12 +476,184 @@ async function sayOnServer(ctx, base, opts, out, { text, chosen, model, name, ou
     await Promise.all(pending.map(([, tmp]) => rm(tmp, { force: true })));
     throw new CliError(`could not write the line into ${outDir} (${error?.code ?? error?.message ?? error}); run say --server again (a repeat costs no characters)`);
   }
-  const duration = answer.line.duration;
-  const { play, playNote } = await playLink(ctx, base, opts, target, avatarKey, answer.audio);
-  // the audio's public URL and the timings too: an agent (minimoji mcp) or a web page needs no file
-  return out({ line: linePath, audio: audioPath, duration, server: true, chars: answer.chars, charged: answer.charged, cached: answer.cached, audioUrl: answer.audio, words: answer.words ?? null, letters: answer.letters ?? null, play, ...(playNote ? { playNote } : {}) },
-    [`Wrote ${linePath}\n  and ${audioPath} (${Number(duration).toFixed(2)} s, ${answer.cached ? "from the cache, no characters" : `${answer.charged} characters of Minimoji's voice`}).`,
-      play ? `Play it: ${play}` : `No play link: ${playNote}`].join("\n"));
+  return { answer, linePath, audioPath };
+}
+
+// ─── a whole deck ───────────────────────────────────────────────────────────
+
+/** POST /lines/say's bucket (convex/lib/keys.ts `say: { rate: 10, period: 60_000, capacity: 10 }`): one every 6 s */
+export const SAY_PACE_MS = 6000;
+export const MANIFEST_VERSION = 1;
+/** what a manifest entry must match for its line to be kept as it is */
+const SAME = ["textSha256", "voice", "model", "mood", "effect", "settings", "server"];
+
+export const textSha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex");
+
+/** a presenter deck's slides.json → its voice and the lines to say, in order: slide<N>, then its nudge
+ *  (`wait.nudge`, said when the viewer doesn't act), then slide<N+1> */
+export async function readDeck(ctx, file) {
+  let data;
+  try { data = JSON.parse(await readFile(resolvePath(ctx.cwd, file), "utf8")); } catch (error) {
+    throw new CliError(`--texts ${file}: ${error.code === "ENOENT" ? "no such file" : "not JSON"}`);
+  }
+  if (!Array.isArray(data?.slides) || !data.slides.length) throw new CliError(`--texts ${file} is not a deck: say --texts reads { "slides": [{ "say": "…" }, …] }`);
+  const check = (what, text) => {
+    if (typeof text !== "string" || !text.trim()) throw new CliError(`${file}: ${what} has nothing to say`);
+    if (text.length > MAX_TEXT) throw new CliError(`${file}: ${what} is ${text.length} characters; a line is at most ${MAX_TEXT}`);
+    return text;
+  };
+  const items = [];
+  data.slides.forEach((slide, n) => {
+    const mood = typeof slide?.mood === "string" && slide.mood ? slide.mood : null;
+    items.push({ name: `slide${n}`, text: check(`slide ${n}`, slide?.say), mood });
+    const nudge = slide?.wait?.nudge;
+    if (typeof nudge === "string" && nudge.trim()) items.push({ name: `slide${n}-nudge`, text: check(`slide ${n}'s nudge`, nudge), mood });
+    else if (nudge != null && typeof nudge !== "string") throw new CliError(`${file}: slide ${n}'s wait.nudge is the words to say`);
+  });
+  const voice = data.voice && typeof data.voice === "object" && !Array.isArray(data.voice) ? data.voice : {};
+  if (voice.provider != null && voice.provider !== "elevenlabs") throw new CliError(`${file}: voice.provider is "elevenlabs", the only one say speaks with`);
+  return { voice, items };
+}
+
+/** `<out>/manifest.json`: what each line was said from, so a re-run says only what changed */
+async function readManifest(path) {
+  let text;
+  try { text = await readFile(path, "utf8"); } catch (error) {
+    if (error.code === "ENOENT") return { version: MANIFEST_VERSION, lines: {} };
+    throw new CliError(`can't read ${path} (${error.code ?? error.message})`);
+  }
+  let data;
+  try { data = JSON.parse(text); } catch { data = null; }
+  // a broken cache must not quietly re-voice (and re-pay for) every line
+  if (data?.version !== MANIFEST_VERSION || !data.lines || typeof data.lines !== "object") throw new CliError(`${path} is not a manifest this CLI writes; delete it to say every line again`);
+  return data;
+}
+
+async function writeManifest(path, manifest) {
+  const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(tmp, `${JSON.stringify(manifest, null, 2)}\n`);
+    await rename(tmp, path);
+  } catch (error) {
+    await rm(tmp, { force: true });
+    throw new CliError(`could not write ${path} (${error?.code ?? error?.message ?? error})`);
+  }
+}
+
+const present = (path) => access(path).then(() => true, () => false);
+
+/** `say [<avatar>] --texts slides.json`: every slide's line (and nudge) voiced as slide<N>.wav + .json, then
+ *  re-timed on its own audio (POST /lines, the text aligned), one call at a time under the rate limits. Lines whose
+ *  text, voice, model, mood and effect match the manifest are kept; a short 429 is waited out, a long one stops
+ *  the run with what was written */
+async function sayDeck(ctx, base, opts, out, [target, ...extra]) {
+  if (extra.length) throw new CliError("say --texts takes the words from the deck: pass at most the avatar, no text");
+  if (opts.name) throw new CliError("say --texts names each line slide<N>; --name is for one line");
+  checkEffect(opts.effect);
+  const { voice: deck, items } = await readDeck(ctx, opts.texts);
+  const outDir = resolvePath(ctx.cwd, opts.out ?? "lines");
+  const settings = parseSettings(opts.settings);
+
+  // the voice: --voice, else the deck's, else the avatar's library voice
+  const given = opts.voice ?? (typeof deck.voiceId === "string" && deck.voiceId ? deck.voiceId : null);
+  let chosen, byName = false;
+  if (given) {
+    const effect = opts.effect ?? deck.effect ?? "none", kept = settings ?? deck.settings ?? null;
+    chosen = { voiceId: given, effect, ...(kept ? { settings: kept } : {}) };
+    byName = effect === "none" && !kept;
+  } else if (target) {
+    const entry = resolveTarget(target, await listLibrary(ctx, base), { anyKey: AVATAR_KEY.test(target) });
+    if (!entry.ttsVoice) throw new CliError(`${entry.name ?? target} has no voice yet; put voice.voiceId in the deck, pass --voice, or minimoji voice ${entry.name ?? target} <voice>`);
+    const kept = settings ?? entry.ttsVoice.settings ?? null;
+    chosen = { voiceId: entry.ttsVoice.voiceId, effect: opts.effect ?? entry.ttsVoice.effect ?? "none", ...(kept ? { settings: kept } : {}) };
+  } else throw new CliError("say --texts needs a voice: voice.voiceId in the deck, --voice, or an avatar that has one (minimoji say kai --texts slides.json)");
+  checkEffect(chosen.effect);
+  const model = opts.model ?? (typeof deck.model === "string" && deck.model ? deck.model : DEFAULT_MODEL);
+  const retime = !opts["no-retime"];
+
+  const manifestPath = join(outDir, "manifest.json");
+  const manifest = await readManifest(manifestPath);
+  const plan = [];
+  for (const item of items) {
+    // settings and the path (--server, Minimoji's voice, or your own key) are the audio too: a trial on --server is
+    // re-voiced by the production run on your key. Both are left out when unset (compared as null), so a manifest
+    // keeps the spec's shape and older ones still match
+    const want = { textSha256: textSha256(item.text), voice: chosen.voiceId, model, mood: item.mood ?? opts.mood ?? null, effect: chosen.effect,
+      ...(chosen.settings ? { settings: JSON.stringify(chosen.settings) } : {}), ...(opts.server ? { server: true } : {}) };
+    const line = join(outDir, `${item.name}.json`), audio = join(outDir, `${item.name}.wav`);
+    const had = manifest.lines[item.name];
+    const kept = !!had && SAME.every((k) => (had[k] ?? null) === (want[k] ?? null)) && (await present(line)) && (await present(audio));
+    plan.push({ ...item, mood: want.mood, want, line, audio, voice: !kept, retime: retime && !(kept && had.retimed) });
+  }
+
+  if (opts["dry-run"]) {
+    const lines = plan.map((p) => ({ name: p.name, status: p.voice ? (p.retime ? "would say and re-time" : "would say") : p.retime ? "would re-time" : "unchanged", characters: p.voice ? p.text.length : 0, line: p.line, audio: p.audio }));
+    const characters = lines.reduce((n, l) => n + l.characters, 0);
+    return out({ dryRun: true, out: outDir, voice: chosen.voiceId, model, server: !!opts.server, characters, lines },
+      [...lines.map((l) => `${l.status} ${l.name}${l.characters ? ` (${l.characters} characters)` : ""}`),
+        `${characters} characters to ${opts.server ? "Minimoji's voice" : "ElevenLabs"} (${model}, voice ${chosen.voiceId}). Nothing was sent.`].join("\n"));
+  }
+
+  // before any paid call: the key, the builder, every mood and the folder
+  let key = null, voiceId = chosen.voiceId, builder = null, serverV = null;
+  if (plan.some((p) => p.voice)) {
+    if (opts.server) {
+      if (opts["elevenlabs-key"]) throw new CliError("--server speaks on Minimoji's voice (your Minimoji key's characters); --elevenlabs-key is for the local path: drop one of them");
+      serverV = serverVoice(chosen, byName);
+    } else {
+      key = elevenKey(ctx, opts);
+      voiceId = (await resolveVoice(ctx, opts, chosen.voiceId)).voiceId;
+      builder = await lineBuilder(ctx);
+      for (const mood of new Set(plan.filter((p) => p.voice && p.mood).map((p) => p.mood))) {
+        try { builder.validateLine(builder.buildLine({ pcm: new Float32Array(SAMPLE_RATE / 10), sampleRate: SAMPLE_RATE, mood })); } catch {
+          throw new CliError(`"${mood.slice(0, 40)}" is not a mood the line format knows (happy, joy, sad, thinking, surprised…)`);
+        }
+      }
+    }
+  }
+  try { await mkdir(outDir, { recursive: true }); } catch (error) {
+    throw new CliError(`can't write lines into ${outDir} (${error?.code ?? error?.message ?? error})`);
+  }
+
+  const paceLines = pacer(ctx, LINES_PACE_MS), paceSay = pacer(ctx, SAY_PACE_MS);
+  const results = [];
+  let stopped = null;
+  for (const p of plan) {
+    const r = { name: p.name, line: p.line, audio: p.audio };
+    results.push(r);
+    if (stopped) { Object.assign(r, { status: "not sent", reason: "the run stopped first" }); continue; }
+    if (!p.voice && !p.retime) { r.status = "unchanged"; continue; }
+    try {
+      if (p.voice) {
+        if (opts.server) await speakServer(ctx, base, opts, { body: { text: p.text, voice: serverV, model, ...(p.mood ? { mood: p.mood } : {}) }, name: p.name, outDir, pace: paceSay });
+        else await speakLocal(ctx, { key, voiceId, chosen, model, text: p.text, mood: p.mood, name: p.name, outDir, ...builder });
+        r.voiced = true;
+        manifest.lines[p.name] = { ...p.want, retimed: false };
+        await writeManifest(manifestPath, manifest);
+      }
+      if (p.retime) {
+        await lineForClip(ctx, base, opts, { clip: p.audio, name: p.name, text: p.text, mood: p.mood, linePath: p.line, pace: paceLines });
+        r.retimed = true;
+        manifest.lines[p.name] = { ...p.want, retimed: true };
+        await writeManifest(manifestPath, manifest);
+      }
+      r.status = "written";
+    } catch (error) {
+      if (!(error instanceof CliError)) throw error;
+      // one failure stops the deck: the lines after it are paid calls that would likely fail the same way
+      stopped = error;
+      Object.assign(r, { status: r.voiced ? "not re-timed" : "failed", reason: error.message });
+    }
+  }
+
+  const failed = results.filter((r) => r.status !== "written" && r.status !== "unchanged").length;
+  const human = results.map((r) => r.status === "written" ? `wrote ${r.name}.wav + .json (${[r.voiced && "voiced", r.retimed && "re-timed"].filter(Boolean).join(", ")})`
+    : r.status === "unchanged" ? `${r.name} unchanged` : `${r.status} ${r.name}: ${r.reason}`);
+  human.push(`Lines in ${outDir}; ${manifestPath} says what each was said from.`);
+  if (failed) human.push(`${failed} of ${results.length} line(s) not done.`);
+  if (stopped) { human.push(`Stopped: ${stopped.message}`); ctx.stderr(`minimoji: ${stopped.message}\n`); }
+  out({ out: outDir, manifest: manifestPath, voice: chosen.voiceId, model, server: !!opts.server, lines: results, ...(stopped ? { stopped: stopped.message } : {}) }, human.join("\n"));
+  return failed ? 1 : 0;
 }
 
 const NO_PLAY_LOCAL = "the line was spoken on your own ElevenLabs key and kept only here; say --server keeps it at Minimoji, with a link that plays it";

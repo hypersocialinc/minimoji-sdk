@@ -220,6 +220,7 @@ async function listVoices(ctx, base, _opts, out) {
 export const RESOURCES = [
   { uri: "minimoji://skill/web", skill: "minimoji-web", name: "minimoji-web", title: "Minimoji web SDK guide", description: "How to add Minimoji heads to a React or Next.js app (@minimoji/react): the SKILL.md `minimoji skills add` installs.", mimeType: "text/markdown" },
   { uri: "minimoji://skill/swift", skill: "minimoji-swift", name: "minimoji-swift", title: "MinimojiKit (Swift) guide", description: "How to add Minimoji heads to an iOS app with MinimojiKit: the SKILL.md `minimoji skills add` installs.", mimeType: "text/markdown" },
+  { uri: "minimoji://skill/presenter", skill: "minimoji-presenter", name: "minimoji-presenter", title: "Minimoji presenter guide", description: "How to build an onboarding or product intro a Mini avatar presents (one voiced line per slide, bubble captions, steps that wait for the person): the SKILL.md `minimoji skills add` installs, beside its starter deck.", mimeType: "text/markdown" },
 ];
 
 // ─── arguments ──────────────────────────────────────────────────────────────
@@ -330,7 +331,7 @@ const INSTRUCTIONS = [
   "Minimoji makes Mini avatars: small 3D heads that talk with lip-sync, show moods and carry a status into every app that wears them.",
   "This server runs as the terminal signed in with `minimoji login`. If a tool says the terminal is not signed in, ask the person to run `minimoji login` in a terminal; signing in and API keys never go through here.",
   "Each tool's description says what it spends (a generation, characters of speech); tell the person before spending much.",
-  "Typical flow: make_avatar → say → show the person say's play link, where the avatar speaks the line (preview_link for a still head; set_status for a status). The resources minimoji://skill/web and minimoji://skill/swift are the SDK guides for putting a head in an app.",
+  "Typical flow: make_avatar → say → show the person say's play link, where the avatar speaks the line (preview_link for a still head; set_status for a status). The resources minimoji://skill/web and minimoji://skill/swift are the SDK guides for putting a head in an app; minimoji://skill/presenter is the guide to a deck or onboarding a head presents.",
 ].join(" ");
 
 /** the answer to one request, or null for a notification */

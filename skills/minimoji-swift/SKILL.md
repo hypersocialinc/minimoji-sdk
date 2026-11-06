@@ -728,7 +728,9 @@ everything played and a look let go), `stop(on:)` to let go.
 ### A host that talks (onboarding, tours)
 
 A character that says one line per screen: `MinimojiLinePlayer` plus a
-few rules.
+few rules. For a whole onboarding the character presents (a pager, a voiced
+line each, steps that wait for the app's own view), see the
+`minimoji-presenter` skill's SwiftUI recipe.
 
 - **One line per screen.** Start it on appear after a 250–500 ms lead-in;
   tapping the head replays it. Pick lines at random, never the same one

@@ -53,6 +53,8 @@ export async function call(ctx, base, method, path, { token, body, allow = [] } 
   const why = data && typeof data.error === "string" ? data.error : text.trim().slice(0, 200) || res.statusText;
   const error = new CliError(`${method} ${path} failed (${res.status}): ${why}`);
   error.status = res.status;
+  // a 429 says how long to wait (convex/http.ts): a batch that paces itself waits that long and tries again
+  if (Number.isFinite(data?.retryAfterMs)) error.retryAfterMs = data.retryAfterMs;
   throw error;
 }
 

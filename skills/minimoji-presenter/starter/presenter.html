@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>savethis · Dash shows you around</title>
+  <link rel="stylesheet" href="presenter.css">
+</head>
+<body>
+  <!-- Every slide's words are in this HTML (search engines, no-JS visitors). presenter.js only plays it.
+       Product content lives here and in slides.json; presenter.js has none. -->
+  <div class="pd" aria-roledescription="presentation">
+    <header class="pd-top">
+      <a class="pd-brand" href="#">savethis</a>
+      <nav class="pd-ctas" data-pd-ui>
+        <a class="pd-cta" href="#app">Get the app</a>
+        <a class="pd-cta pd-cta-ghost" href="#mcp">Add to your AI</a>
+        <button class="pd-skip" type="button" data-pd-skip>Skip intro</button>
+      </nav>
+    </header>
+
+    <main class="pd-stagewrap">
+      <button class="pd-arrow pd-arrow-prev" type="button" data-pd-prev aria-label="Previous slide">‹</button>
+      <section class="pd-card">
+        <div class="pd-glow" aria-hidden="true"></div>
+
+        <article class="pd-slide is-on" data-pd-slide="hello">
+          <h1 class="pd-headline">Everything you love, in one place.</h1>
+          <div class="pd-gate">
+            <button class="pd-play" type="button" data-pd-play>▶ Play</button>
+            <p class="pd-gate-sub">Dash shows you around · about 45 s · sound on</p>
+          </div>
+          <ul class="ex-assistants" aria-label="Works with">
+            <li class="ex-assistant">Claude</li><li class="ex-assistant">ChatGPT</li><li class="ex-assistant">Gemini</li><li class="ex-assistant">Cursor</li>
+          </ul>
+        </article>
+
+        <article class="pd-slide" data-pd-slide="save">
+          <h2 class="pd-title">Save anything you love</h2>
+          <p class="pd-sub">Here, or through your AI assistant.</p>
+          <div class="ex-saves pd-row">
+            <div class="ex-save pd-chip-card"><b>A title</b><span>Dune: Part Two</span></div>
+            <div class="ex-save pd-chip-card"><b>A link</b><span>nytimes.com/…</span></div>
+            <div class="ex-save pd-chip-card"><b>A TikTok</b><span>@pastaqueen</span></div>
+          </div>
+          <!-- the host's UI for this waiting step: presenter.js shows it (.is-waiting) and never reads it -->
+          <div class="pd-wait" data-pd-ui role="group" aria-label="What should Dash show you next?">
+            <button class="pd-choice" type="button" data-choice="filing">How it's filed</button>
+            <button class="pd-choice" type="button" data-choice="sharing">Who can use it</button>
+          </div>
+        </article>
+
+        <article class="pd-slide" data-pd-slide="file">
+          <h2 class="pd-title">Filed and looked up</h2>
+          <ul class="ex-facts pd-row"><li class="pd-chip-card">★ 8.6</li><li class="pd-chip-card">▶ Trailer</li><li class="pd-chip-card">Where to watch</li><li class="pd-chip-card">Why you'll like it</li></ul>
+        </article>
+
+        <article class="pd-slide" data-pd-slide="open">
+          <h2 class="pd-title">Open to your assistants</h2>
+          <ul class="ex-agents pd-row"><li class="pd-chip-card">Claude</li><li class="pd-chip-card">ChatGPT</li><li class="pd-chip-card">Gemini</li></ul>
+        </article>
+
+        <article class="pd-slide" data-pd-slide="decks">
+          <h2 class="pd-title">Decks dealt for you</h2>
+          <div class="ex-hand pd-row"><div class="pd-chip-card">Cozy sci-fi</div><div class="pd-chip-card">Tokyo eats</div><div class="pd-chip-card">Rainy-day reads</div></div>
+          <!-- a permission-style step: the host asks the browser or its own backend, then calls deck.done('notify', …) -->
+          <div class="pd-wait" data-pd-ui role="group" aria-label="Deck alerts">
+            <button class="pd-choice" type="button" data-permission="allowed">Turn on alerts</button>
+            <button class="pd-choice pd-choice-quiet" type="button" data-permission="later">Not now</button>
+          </div>
+        </article>
+
+        <article class="pd-slide pd-dark" data-pd-slide="bye">
+          <h2 class="pd-title">A passport for your taste.</h2>
+        </article>
+
+        <div class="pd-ending" data-pd-ui>
+          <h2 class="pd-title">Start saving.</h2>
+          <div class="pd-ending-ctas">
+            <a class="pd-cta pd-cta-big" href="#app">Get the app</a>
+            <a class="pd-cta pd-cta-big pd-cta-ghost" href="#mcp">Add to your AI</a>
+          </div>
+          <button class="pd-replay" type="button" data-pd-replay>↻ Replay</button>
+        </div>
+
+        <div class="pd-character">
+          <div class="pd-bubble" role="status" aria-live="polite"><p class="pd-bubble-text"></p></div>
+          <div class="pd-head"></div>
+          <img class="pd-poster" src="img/agent.webp" alt="D.A.S.H., the presenter">
+        </div>
+
+        <button class="pd-pause" type="button" data-pd-pause aria-label="Pause or resume">❚❚</button>
+        <button class="pd-sound" type="button" data-pd-sound aria-pressed="true" aria-label="Sound">♪</button>
+      </section>
+      <button class="pd-arrow pd-arrow-next" type="button" data-pd-next aria-label="Next slide">›</button>
+    </main>
+    <nav class="pd-dots" aria-label="Slides"></nav>
+    <footer class="pd-foot">savethis · <a href="#privacy">Privacy</a> · <a href="#faq">FAQ</a></footer>
+  </div>
+
+  <script type="module">
+    import { startPresenter } from './presenter.js';
+    const root = document.querySelector('.pd');
+    const deck = await startPresenter(root, { slides: 'slides.json', lines: 'lines/' });
+    // the host owns the waiting steps' UI and data: answer the deck, store the choice yourself
+    root.querySelectorAll('[data-choice]').forEach((b) => b.addEventListener('click', () => deck.done('topic', b.dataset.choice)));
+    root.querySelectorAll('[data-permission]').forEach((b) => b.addEventListener('click', () => deck.done('notify', b.dataset.permission)));
+    root.querySelector('[data-pd-skip]').addEventListener('click', () => deck.skip());
+    deck.on('waiting', ({ id }) => root.querySelector(`[data-pd-slide="${id}"] .pd-wait button`)?.focus({ preventScroll: true }));
+    window.presenter = deck;   // for a browser check; drop it in your app
+  </script>
+</body>
+</html>

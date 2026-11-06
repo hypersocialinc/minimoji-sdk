@@ -207,6 +207,46 @@ minimoji say kai "[excited] Hi, I'm Billie"      # minimoji-lines/hi-i-m-billie.
   points it anywhere else. If it can't be downloaded or loaded, `say` stops
   with one error before the paid call and writes nothing.
 
+### A whole deck: `say --texts slides.json`
+
+A presenter deck (the `minimoji-presenter` skill) has one line per slide in
+its `slides.json`. `say --texts` says them all and re-times each on its own
+audio, so you never write the loop yourself:
+
+```sh
+minimoji say --texts slides.json --out lines        # the deck's voice.voiceId; lines/slide0.wav + .json, …
+minimoji say kai --texts slides.json                # kai's library voice, when the deck names none
+minimoji say --texts slides.json --dry-run          # what would be said or re-timed, and the characters
+```
+
+- **What it reads**: `{ "voice": { "voiceId", "model"?, "effect"? }, "slides": [{ "say", "mood"?, "wait"?: { "nudge"? } }] }`.
+  Each slide's `say` becomes `slide<N>.wav` + `slide<N>.json`, said with that
+  slide's `mood`. A slide that waits for the viewer and has a `wait.nudge`
+  gets `slide<N>-nudge.wav` + `.json` too, right after it (`wait.prompt` is
+  shown, never said). The voice is `--voice`, else the deck's `voice.voiceId`,
+  else the avatar's library voice; `--model`, `--effect` and `--settings` win
+  over the deck's. `--server` says them on Minimoji's voice instead.
+- **Re-timed**: after each line is said, the same `POST /lines` call
+  `minimoji lines --text` makes force-aligns its text to the final audio,
+  with the slide's mood, so the lips and the lit word follow the real clip.
+  `--no-retime` skips it (a later run without it re-times only).
+- **Paced**: one call at a time, in order (slide 0 said, slide 0 re-timed,
+  slide 1 said, …). `POST /lines` goes at most one every 3 s and
+  `POST /lines/say` one every 6 s, the routes' steady rates. A 429 that asks
+  to wait 60 s or less is waited out and the same line sent again (at most 3
+  times); a longer one (a day's quota), or any other failure, stops the run,
+  and the summary says what was written. The exit code is 1 when a line was
+  not done.
+- **Cached**: `lines/manifest.json` is
+  `{ "version": 1, "lines": { "slide0": { "textSha256", "voice", "model", "mood", "effect", "retimed" } } }`,
+  written after every line. A line whose entry matches (and whose `.wav` and
+  `.json` are there) is not said again, so rewording one slide re-says only
+  that slide. `textSha256` is the SHA-256 of the `say` text as UTF-8, so a
+  page can check its lines still match its text.
+- `--json` gives `{out, manifest, voice, model, server, lines: [{name, line, audio, status, voiced?, retimed?, reason?}], stopped?}`;
+  `status` is `written`, `unchanged`, `not re-timed` (said, then stopped),
+  `failed` or `not sent`.
+
 ## Lines from clips you already have
 
 Have recordings already (another TTS, a human voice, an earlier batch)?
@@ -224,8 +264,9 @@ minimoji lines ./clips --dry-run                       # what would be sent; not
 | `minimoji lines <clip \| folder>… [--text "…" \| --texts lines.json] [--out dir] [--timings] [--dry-run]` | one `POST /lines` per clip; writes `<name>.json` beside the clip (or in `--out`) and, with `--timings`, `<name>.timings.json` = `{transcript, words, letters, alignedTo, loss?}` (seconds). `--json` gives `{clips: [{clip, name, status, line, timings?, alignedTo?, loss?, reason?}], skipped}` |
 
 - **The text** of a clip comes from `--text` (one clip), `--texts`
-  (`{"<name>": "text"}`, or the `{"<name>": {"text": …}}` of an app's
-  `lines.json`) or a `<name>.txt` beside it. With it, the service
+  (`{"<name>": "text"}`, the `{"<name>": {"text": …}}` of an app's
+  `lines.json`, or a deck's `slides.json`, whose clips are `slide0`,
+  `slide0-nudge`, `slide1`, …) or a `<name>.txt` beside it. With it, the service
   force-aligns that script to the audio, so the lips follow the words as
   written (`alignedTo: "text"`; a high `loss` says text and audio disagree).
   A clip with no text is transcribed (`alignedTo: "transcript"`). `[tags]`
@@ -239,6 +280,9 @@ minimoji lines ./clips --dry-run                       # what would be sent; not
   carry on; the exit code is 1 if any was skipped. A refused key, a spent
   day (each clip is one of the key's 200 lines a day) or the route switched
   off stops the run.
+- **Pace**: clips go one at a time, at most one every 3 s (the route allows a
+  burst of 5, then one every 3 s). A 429 that asks to wait 60 s or less is
+  waited out and the clip sent again, at most 3 times.
 - **Privacy**: the audio and the text go to Minimoji and to ElevenLabs, and
   are not stored.
 

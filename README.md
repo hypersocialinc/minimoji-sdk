@@ -21,6 +21,12 @@ skills/
     SKILL.md              the MinimojiKit skill for Swift apps
   minimoji-web/
     SKILL.md              the @minimoji/react skill for web apps
+  minimoji-presenter/
+    SKILL.md              decks and onboarding a Mini avatar presents
+    starter/              a working deck: HTML + the heads bundle, six voiced lines
+    scripts/make-lines.sh slides.json → voiced, re-timed lines (never prints a key)
+    react/                the same deck as a React component
+    swift/                the SwiftUI recipe
 ```
 
 ## The CLI
@@ -44,6 +50,7 @@ and `npx minimoji skills update` refreshes it. Or with the `skills` tool:
 ```sh
 npx skills add hypersocialinc/minimoji-sdk --skill minimoji-swift
 npx skills add hypersocialinc/minimoji-sdk --skill minimoji-web
+npx skills add hypersocialinc/minimoji-sdk --skill minimoji-presenter
 ```
 
 The Swift skill integrates [MinimojiKit](https://www.minimoji.com/developers),

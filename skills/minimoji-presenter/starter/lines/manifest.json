@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "lines": {
+    "slide0": {
+      "textSha256": "e7ff3b647d28c47726b35632f039a2d968763abcab6e518b66a752bf762cd74c",
+      "voice": "cseBT3RQoApCirnEwyFt",
+      "model": "eleven_v4",
+      "mood": "happy",
+      "effect": "none",
+      "retimed": true
+    },
+    "slide1": {
+      "textSha256": "b791333a4209cebb6541289a76340c46fcf70e76b4ef281f8fdebc9d65a55036",
+      "voice": "cseBT3RQoApCirnEwyFt",
+      "model": "eleven_v4",
+      "mood": "happy",
+      "effect": "none",
+      "retimed": true
+    },
+    "slide2": {
+      "textSha256": "f006689467a88a407bcdf3c36e6f547b82832e746d137a61ee329f9e1564af3a",
+      "voice": "cseBT3RQoApCirnEwyFt",
+      "model": "eleven_v4",
+      "mood": "happy",
+      "effect": "none",
+      "retimed": true
+    },
+    "slide3": {
+      "textSha256": "8e47a1394fc0aef46e310d864b2e276ccade9c404e68ca62542cf08471357928",
+      "voice": "cseBT3RQoApCirnEwyFt",
+      "model": "eleven_v4",
+      "mood": "happy",
+      "effect": "none",
+      "retimed": true
+    },
+    "slide4": {
+      "textSha256": "2a7e098e12397dac2093e39d0c679ad6b42170d893cff573b09dd8670a945be2",
+      "voice": "cseBT3RQoApCirnEwyFt",
+      "model": "eleven_v4",
+      "mood": "happy",
+      "effect": "none",
+      "retimed": true
+    },
+    "slide5": {
+      "textSha256": "c59c580670e17dd2200542d9db5d985717063990f31a9f55bd09f9374aac85b0",
+      "voice": "cseBT3RQoApCirnEwyFt",
+      "model": "eleven_v4",
+      "mood": "happy",
+      "effect": "none",
+      "retimed": true
+    }
+  }
+}

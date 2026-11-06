@@ -1,0 +1,70 @@
+{
+  "character": { "id": "agent" },
+  "voice": { "provider": "elevenlabs", "voiceId": "cseBT3RQoApCirnEwyFt", "model": "eleven_v4" },
+  "holdMs": 250,
+  "gate": { "title": "Play", "sub": "Dash shows you around · about 45 s · sound on" },
+  "slides": [
+    {
+      "id": "hello",
+      "say": "Hi, I'm Dash. savethis works with your favorite AI assistants to keep everything you love in one place. Let me show you.",
+      "pos": "center",
+      "gesture": "sunny-nod",
+      "mood": "happy",
+      "wash": "#FFFFFF",
+      "reveals": [{ "word": "favorite", "selector": ".ex-assistant" }],
+      "beats": [{ "at": 1700, "look": ".ex-assistants" }, { "at": 3600, "look": "viewer" }]
+    },
+    {
+      "id": "save",
+      "say": "Save anything you love, here or through your AI assistant. A title, a link, a TikTok.",
+      "pos": "left",
+      "gesture": "knowing-nod",
+      "mood": "happy",
+      "wash": "#FFF7EC",
+      "reveals": [{ "word": "here", "selector": ".ex-save" }],
+      "beats": [{ "at": 1700, "look": ".ex-saves" }, { "at": 4600, "look": "viewer" }],
+      "wait": { "for": "topic", "prompt": "What should I show you next?", "nudge": "Pick one of the two, and I'll show you that.", "nudgeAfterMs": 8000 },
+      "next": { "filing": "file", "sharing": "open" }
+    },
+    {
+      "id": "file",
+      "say": "I file it in the right pile and look it up: the score, the trailer, where to watch, and why you'll like it.",
+      "pos": "left",
+      "gesture": "lightbulb",
+      "mood": "happy",
+      "wash": "#EEF6FF",
+      "beats": [{ "at": 2200, "look": ".ex-facts", "mood": "thinking" }, { "at": 3400, "mood": "happy" }, { "at": 5800, "look": "viewer" }],
+      "next": "decks"
+    },
+    {
+      "id": "open",
+      "say": "All of it is open to your favorite AI assistants. The more you save, the more useful they get.",
+      "pos": "right",
+      "gesture": "sunny-nod",
+      "mood": "happy",
+      "wash": "#F2FBF4",
+      "beats": [{ "at": 1600, "look": ".ex-agents", "gesture": "double-take" }, { "at": 4400, "look": "viewer" }]
+    },
+    {
+      "id": "decks",
+      "say": "They can even deal you decks of recommendations based on what you already like. Swipe through them in the savethis app to react.",
+      "pos": "right",
+      "gesture": "lightbulb",
+      "mood": "happy",
+      "wash": "#FBF2FF",
+      "beats": [{ "at": 300, "look": ".ex-hand" }, { "at": 6400, "look": "viewer" }],
+      "wait": { "for": "notify", "prompt": "Want a nudge when a new deck is dealt?" }
+    },
+    {
+      "id": "bye",
+      "say": "The more you save, the more useful your AI assistants get. savethis: a passport for your taste.",
+      "pos": "center",
+      "gesture": "bow",
+      "mood": "happy",
+      "wash": "#1F2230",
+      "dark": true,
+      "beats": [{ "at": 3600, "gesture": "sunny-nod" }]
+    }
+  ],
+  "ending": { "pos": "left", "mood": "joy", "lookAt": ".pd-ending-ctas", "glanceEveryMs": 2800 }
+}

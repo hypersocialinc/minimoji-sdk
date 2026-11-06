@@ -104,19 +104,85 @@ export async function findClips(ctx, given) {
   return [...new Set(clips)];
 }
 
-/** `--texts` (`{ "<name>": "text" }`, or the app's lines.json `{ "<name>": { text, … } }`) → name → text */
+/** `--texts` (`{ "<name>": "text" }`, the app's lines.json `{ "<name>": { text, … } }`, or a presenter deck's
+ *  slides.json `{ slides: [{ say, wait?: { nudge } }] }`, whose clips are slide0, slide0-nudge, slide1, …) → name → text */
 export async function readTexts(ctx, file) {
   let data;
   try { data = JSON.parse(await readFile(resolvePath(ctx.cwd, file), "utf8")); } catch (error) {
     throw new CliError(`--texts ${file}: ${error.code === "ENOENT" ? "no such file" : "not JSON"}`);
   }
-  if (!data || typeof data !== "object" || Array.isArray(data)) throw new CliError(`--texts ${file} must be { "<clip name>": "what it says" }`);
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new CliError(`--texts ${file} must be { "<clip name>": "what it says" } or a deck's { "slides": [{ "say": "…" }] }`);
   const texts = new Map();
+  if (Array.isArray(data.slides)) {
+    data.slides.forEach((slide, n) => {
+      if (typeof slide?.say === "string") texts.set(`slide${n}`, slide.say);
+      // a step that waits for the viewer has a nudge line too, said if they don't act
+      if (typeof slide?.wait?.nudge === "string" && slide.wait.nudge.trim()) texts.set(`slide${n}-nudge`, slide.wait.nudge);
+    });
+    return texts;
+  }
   for (const [name, value] of Object.entries(data)) {
     const text = typeof value === "string" ? value : typeof value?.text === "string" ? value.text : null;
     if (text != null) texts.set(name, text);
   }
   return texts;
+}
+
+/** POST /lines' bucket (convex/lib/keys.ts `lines: { rate: 20, period: 60_000, capacity: 5 }`): a burst of 5, then
+ *  one call every 3 s, per key and caller address. A batch spends it at the steady rate, never the burst */
+export const LINES_PACE_MS = 3000;
+/** a 429 that asks for at most this long is waited out and the same call sent again; a longer one (a day's
+ *  quota) stops the run */
+export const RETRY_WAIT_MAX_MS = 60_000;
+export const MAX_RETRIES = 3;
+
+/** calls one at a time, at least `gapMs` apart on the ctx's clock; a short 429 waits its `retryAfterMs` and
+ *  sends again (at most MAX_RETRIES times), anything else is the caller's */
+export function pacer(ctx, gapMs) {
+  const now = () => (ctx.now ?? Date.now)();
+  const sleep = ctx.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  let last = null;
+  return async (send) => {
+    for (let retry = 0; ; retry++) {
+      const wait = last == null ? 0 : last + gapMs - now();
+      if (wait > 0) await sleep(wait);
+      last = now();
+      try { return await send(); } catch (error) {
+        const short = error instanceof CliError && error.status === 429 && Number.isFinite(error.retryAfterMs) && error.retryAfterMs <= RETRY_WAIT_MAX_MS;
+        if (!short || retry >= MAX_RETRIES) throw error;
+        ctx.stderr?.(`minimoji: rate limited; waiting ${Math.ceil(error.retryAfterMs / 1000)} s (retry ${retry + 1} of ${MAX_RETRIES})\n`);
+        await sleep(error.retryAfterMs);
+      }
+    }
+  };
+}
+
+/** one clip → its line: the samples checked, one POST /lines (through `pace`, with `text` aligned and `mood` as
+ *  the face it starts on), the line and its timings written. Fields for the clip's result; a CliError says why not */
+export async function lineForClip(ctx, base, opts, { clip, name, text, mood = null, linePath, timingsPath = null, pace, dryRun = false }) {
+  const result = {};
+  const { pcm, sampleRate } = await clipSamples(ctx, clip);
+  result.seconds = Math.round((pcm.length / sampleRate) * 100) / 100;
+  if (!pcm.length) throw new CliError("it has no samples");
+  if (pcm.length / sampleRate > LINES_MAX_SECONDS) throw new CliError(`it is ${result.seconds.toFixed(1)} s; a clip is at most ${LINES_MAX_SECONDS} s (split it)`);
+  const rate = Math.min(sampleRate, SEND_RATE), audio = wav(downsample(pcm, sampleRate, rate), rate);
+  if (audio.length > LINES_MAX_BYTES) throw new CliError(`it is ${(audio.length / 1024 / 1024).toFixed(1)} MB as a WAV; a clip is at most 4 MB`);
+  if (dryRun) return { ...result, status: "would send" };
+  const send = () => {
+    const form = new FormData();
+    form.append("audio", new Blob([audio], { type: "audio/wav" }), `${name}.wav`);
+    if (text != null) form.append("text", text);
+    return keyedCall(ctx, base, opts, "POST", `/lines${mood ? `?mood=${encodeURIComponent(mood)}` : ""}`, form);
+  };
+  const answer = await (pace ?? ((f) => f()))(send);
+  if (!answer?.line || !Array.isArray(answer.words)) throw new CliError("POST /lines answered without a line");
+  const files = [[linePath, `${JSON.stringify(answer.line)}\n`]];
+  const timings = { transcript: answer.transcript ?? "", words: answer.words, letters: answer.letters ?? [], alignedTo: answer.alignedTo ?? "transcript", ...(Number.isFinite(answer.loss) ? { loss: answer.loss } : {}) };
+  if (timingsPath) files.push([timingsPath, `${JSON.stringify(timings, null, 2)}\n`]);
+  try { await writeAll(files); } catch (error) {
+    throw new CliError(`could not write into ${dirname(linePath)} (${error?.code ?? error?.message ?? error})`);
+  }
+  return { ...result, status: "written", alignedTo: timings.alignedTo, ...(timings.loss != null ? { loss: timings.loss } : {}) };
 }
 
 /** each file written aside, then renamed in, the line last: a line on disk always has the timings of its own run
@@ -145,6 +211,7 @@ export async function lines(ctx, base, opts, out, given) {
   }
 
   const results = [];
+  const pace = pacer(ctx, LINES_PACE_MS);
   let stopped = null;
   for (const clip of clips) {
     if (stopped) { results.push({ clip, name: basename(clip, extname(clip)), status: "not sent", reason: "the run stopped first" }); continue; }
@@ -164,29 +231,11 @@ export async function lines(ctx, base, opts, out, given) {
       if (text != null && !text.replace(/\[[^\]]*\]/g, " ").trim()) text = null;
       if (text != null && text.length > LINES_MAX_TEXT) throw new CliError(`its text is ${text.length} characters; a clip's text is at most ${LINES_MAX_TEXT}`);
       result.text = text;
-      const { pcm, sampleRate } = await clipSamples(ctx, clip);
-      result.seconds = Math.round((pcm.length / sampleRate) * 100) / 100;
-      if (!pcm.length) throw new CliError("it has no samples");
-      if (pcm.length / sampleRate > LINES_MAX_SECONDS) throw new CliError(`it is ${result.seconds.toFixed(1)} s; a clip is at most ${LINES_MAX_SECONDS} s (split it)`);
-      const rate = Math.min(sampleRate, SEND_RATE), audio = wav(downsample(pcm, sampleRate, rate), rate);
-      if (audio.length > LINES_MAX_BYTES) throw new CliError(`it is ${(audio.length / 1024 / 1024).toFixed(1)} MB as a WAV; a clip is at most 4 MB`);
-      if (opts["dry-run"]) { result.status = "would send"; continue; }
-      const form = new FormData();
-      form.append("audio", new Blob([audio], { type: "audio/wav" }), `${name}.wav`);
-      if (text != null) form.append("text", text);
-      const answer = await keyedCall(ctx, base, opts, "POST", "/lines", form);
-      if (!answer?.line || !Array.isArray(answer.words)) throw new CliError("POST /lines answered without a line");
-      const files = [[result.line, `${JSON.stringify(answer.line)}\n`]];
-      const timings = { transcript: answer.transcript ?? "", words: answer.words, letters: answer.letters ?? [], alignedTo: answer.alignedTo ?? "transcript", ...(Number.isFinite(answer.loss) ? { loss: answer.loss } : {}) };
-      if (opts.timings) files.push([result.timings, `${JSON.stringify(timings, null, 2)}\n`]);
-      try { await writeAll(files); } catch (error) {
-        throw new CliError(`could not write into ${dir} (${error?.code ?? error?.message ?? error})`);
-      }
-      Object.assign(result, { status: "written", alignedTo: timings.alignedTo, ...(timings.loss != null ? { loss: timings.loss } : {}) });
+      Object.assign(result, await lineForClip(ctx, base, opts, { clip, name, text, linePath: result.line, timingsPath: result.timings ?? null, pace, dryRun: !!opts["dry-run"] }));
     } catch (error) {
       if (!(error instanceof CliError)) throw error;
-      // a refusal of the key or the day stops the run: every clip after it would be refused the same way; the
-      // summary still says what was written
+      // a refusal of the key or the day stops the run (a short 429 was already waited out and retried): every clip
+      // after it would be refused the same way; the summary still says what was written
       if ([401, 403, 429, 503].includes(error.status)) { stopped = error; Object.assign(result, { status: "not sent", reason: error.message }); continue; }
       Object.assign(result, { status: "skipped", reason: error.message });
     }

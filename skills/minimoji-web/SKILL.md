@@ -626,7 +626,10 @@ Two ways, pick one per head:
 
 ### A host that talks (onboarding, tours)
 
-A character that says one line per screen: `useLine` plus a few rules.
+A character that says one line per screen: `useLine` plus a few rules. For a
+whole onboarding or product intro the character presents (slides, a voiced
+line each, bubble captions, steps that wait for a choice or a sign-in), use
+the `minimoji-presenter` skill and its starter deck.
 
 - **One line per screen.** Start it on appear after a 250–500 ms lead-in;
   a tap on the head replays it. Pick lines at random, never the same one

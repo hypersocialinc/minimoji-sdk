@@ -139,3 +139,60 @@ test("a refusal of one clip (413) skips it and the run carries on; a tag-only te
   assert.deepEqual(seen, [1, null], "b was sent without its tag-only text");
   await svc.close();
 });
+
+test("--texts slides.json: a presenter deck's say (and nudge) is each slideN clip's text; clips go 3 s apart and a short 429 is retried", async () => {
+  const seen = [], slept = [];
+  let clock = 0, n = 0;
+  const svc = await fixtureServer({
+    "POST /lines": async ({ bytes, headers }) => {
+      const form = await new Response(bytes, { headers: { "content-type": headers["content-type"] } }).formData();
+      seen.push({ text: form.get("text"), at: clock });
+      if (n++ === 1) return { status: 429, json: { error: "rate limit for lines reached; retry in 2 s", retryAfterMs: 2000 } };
+      return { json: { line: { version: 1, fps: 60, duration: 1, frames: [], captions: [], cues: [] }, words: [], letters: [], transcript: form.get("text"), alignedTo: "text" } };
+    },
+  });
+  const ctx = await makeCtx({ env: { MINIMOJI_KEY: SECRET } });
+  Object.assign(ctx, { now: () => clock, sleep: async (ms) => { slept.push(ms); clock += ms; } });
+  const dir = join(ctx.cwd, "lines"); await mkdir(dir);
+  for (const name of ["slide0", "slide0-nudge", "slide1"]) await writeFile(join(dir, `${name}.wav`), clip(0.4));
+  await writeFile(join(ctx.cwd, "slides.json"), JSON.stringify({ slides: [{ say: "Hi, I'm Dash.", wait: { for: "tap", prompt: "Tap it", nudge: "Go on." } }, { say: "Let me show you." }] }));
+  try {
+    const r = await run(ctx, ["lines", "lines", "--texts", "slides.json", "--base", svc.url, "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    // a folder goes in name order: slide0-nudge, slide0, slide1
+    assert.deepEqual(seen.map((s) => s.text), ["Go on.", "Hi, I'm Dash.", "Hi, I'm Dash.", "Let me show you."], "slide0 refused once, then sent again");
+    assert.ok(slept.includes(2000), "waited what the 429 asked");
+    for (let i = 1; i < seen.length; i++) assert.ok(seen[i].at - seen[i - 1].at >= 2000);
+    assert.ok(seen[1].at - seen[0].at >= 3000 && seen[3].at - seen[2].at >= 3000, "never faster than one clip every 3 s");
+    assert.deepEqual(r.json.clips.map((c) => c.status), ["written", "written", "written"]);
+  } finally { await svc.close(); }
+});
+
+test("a 429 that names a day stops the run at once (no wait), as before", async () => {
+  const { svc, ctx, seen } = await world({ status: 429, error: "today's 200 recorded lines for this key are spent" });
+  const slept = []; ctx.sleep = async (ms) => { slept.push(ms); };
+  await writeFile(join(ctx.cwd, "a.wav"), clip(0.3)); await writeFile(join(ctx.cwd, "b.wav"), clip(0.3));
+  const r = await run(ctx, ["lines", "a.wav", "b.wav", "--base", svc.url, "--json"]);
+  assert.equal(r.code, 1);
+  assert.equal(seen.length, 1);
+  assert.deepEqual(r.json.clips.map((c) => c.status), ["not sent", "not sent"]);
+  assert.ok(!slept.some((ms) => ms > 3000), "no retry wait without a short retryAfterMs");
+  await svc.close();
+});
+
+test("a short 429 that never clears is retried 3 times, then stops the run (no endless loop)", async () => {
+  let calls = 0;
+  const svc = await fixtureServer({ "POST /lines": () => { calls++; return { status: 429, json: { error: "rate limit for lines reached; retry in 1 s", retryAfterMs: 1000 } }; } });
+  const ctx = await makeCtx({ env: { MINIMOJI_KEY: SECRET } });
+  let clock = 0; const slept = [];
+  Object.assign(ctx, { now: () => clock, sleep: async (ms) => { slept.push(ms); clock += ms; } });
+  await writeFile(join(ctx.cwd, "a.wav"), clip(0.3)); await writeFile(join(ctx.cwd, "b.wav"), clip(0.3));
+  try {
+    const r = await run(ctx, ["lines", "a.wav", "b.wav", "--base", svc.url, "--json"]);
+    assert.equal(r.code, 1);
+    assert.equal(calls, 4, "the first try and 3 retries, then nothing more");
+    assert.equal(slept.filter((ms) => ms === 1000).length, 3);
+    assert.deepEqual(r.json.clips.map((c) => c.status), ["not sent", "not sent"]);
+    assert.match(r.json.stopped, /429/);
+  } finally { await svc.close(); }
+});

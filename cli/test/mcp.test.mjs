@@ -117,7 +117,7 @@ test("mcp: initialize, tools/list (every tool, a schema and what it spends), res
     assert.ok(!tools.some((t) => /login|logout|keys/.test(t.name)), "signing in and keys stay in the terminal");
 
     const { resources } = (await c.request("resources/list")).result;
-    assert.deepEqual(resources.map((r) => r.uri), ["minimoji://skill/web", "minimoji://skill/swift"]);
+    assert.deepEqual(resources.map((r) => r.uri), ["minimoji://skill/web", "minimoji://skill/swift", "minimoji://skill/presenter"]);
     const web = (await c.request("resources/read", { uri: "minimoji://skill/web" })).result.contents[0];
     assert.equal(web.mimeType, "text/markdown");
     assert.match(web.text, /# The minimoji-web guide/);
