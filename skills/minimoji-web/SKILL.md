@@ -955,6 +955,25 @@ const now = await refreshMinimojiGrant({ service, key, grantId });   // { grantI
   puts it in their library and picks it for your app (a 403 if they said no
   to that on the sheet).
 
+### Upgrading an old document
+
+Editors write v3 documents. If your server refuses a write below the stored
+version, upgrade a v1/v2 document before saving it; never hand-stamp `v: 3`
+(v2+ dropped some v1 rules and redraws a few parts):
+
+```js
+import { upgradeAvatar } from '@minimoji/react';
+
+const { doc, effects, changes } = upgradeAvatar(oldDoc);
+// doc.v === 3 and it draws the head oldDoc drew; the rest stays as sparse as it came
+// effects: the rules whose fallbacks were written in ({ id, reason })
+// changes: [{ path: 'freckles' | 'facialHair', reason }] — v2 redrew v1 freckles and facial hair; usually empty
+```
+
+A v3 document (or an unknown version) comes back as the same object; it
+never throws for a version and never downgrades. The Kit's
+`MinimojiDocument.upgraded(_:)` gives the same answer.
+
 ### Their status: the line beside their head
 
 What the person types or says on the Minimoji app's you screen (or sets with

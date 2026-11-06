@@ -836,6 +836,41 @@ let saved = try await yourBackend.saveAvatar(doc)           // response includes
 The response's `avatarKey` is what you store; `renderURL(for:size:)` and
 `head(forKey:)` take it.
 
+### Upgrade an old document before you save it
+
+The editor writes v3 documents (`"v": 3`). If your backend refuses a write
+below the stored version (a no-downgrade guard), a v1 document coming in, such
+as a "replace avatar" pick or `MinimojiEditorView.starter()`, has to be
+upgraded first. Never hand-stamp `"v": 3`: v2+ dropped some v1 rules and
+redraws a few parts, so a restamped head can change. Upgrade it:
+
+```swift
+import MinimojiEditor
+
+// Bunch's case: the user is replacing a v3 head with a v1 starter
+let up = MinimojiDocument.upgraded(MinimojiEditorView.starter())
+let doc = up.doc                        // "v": 3, draws the head the v1 document drew
+// up.effects  the rules whose fallbacks were written in (a beard v1 hid on blonde hair)
+// up.changes  parts v3 draws a little differently, see below; usually empty
+// up.upgraded false when it came back as given (already v3, or a version this Kit does not know)
+try await yourBackend.saveAvatar(doc)   // passes "never below the stored version"
+```
+
+- **Same head, written out.** The upgrade writes in whatever the old version
+  decided implicitly: each rule fallback it applied (`effects`), the ink of a
+  v1 brow on a bald or beanie-covered head (`brow.color: "#100d12"`), and
+  v1 freckles under a mole or plaster turned off (v1 never drew them).
+  Everything else stays as sparse as it came.
+- **`changes`: what cannot stay exact.** v2 redrew freckles (larger, in a
+  skin-based colour) and facial hair (its own beard finish). A v1 head with
+  either still upgrades and lists `freckles` / `facialHair`; no field asks
+  for the old drawing. Show nothing, or let the person see the new head
+  before saving.
+- A v3 document comes back unchanged (`upgraded == false`); so does an
+  unknown version (`"v": 4`). It never throws and never downgrades.
+- The web twin is `upgradeAvatar(doc)` in `@minimoji/react`: the same answer
+  for the same document (both are tested against one fixture).
+
 ### Use my Minimoji: a person's own avatar
 
 A person with a Minimoji account (minimoji.com/me) can bring their avatar
