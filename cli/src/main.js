@@ -5,6 +5,7 @@
 // run every command against a fixture server.
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
+import { ADMIN_USAGE, admin } from "./admin.js";
 import { keys, login, logout, whoami } from "./auth.js";
 import { edit, generate, preview, render, species } from "./avatars.js";
 import { init } from "./init.js";
@@ -73,16 +74,21 @@ const COMMANDS = {
   preview: { run: preview, options: { ...SITE, face: { type: "string" }, body: { type: "boolean" }, "no-browser": { type: "boolean" } },
     usage: "minimoji preview <avatarKey | name | doc.json> [--face happy] [--body] [--no-browser]",
     about: "Open the avatar on minimoji.com/preview. A local document rides in the link's fragment and is never uploaded." },
+  // hidden: left out of the help and the README, for the Minimoji team (the server refuses anyone else)
+  admin: { run: admin, hidden: true, options: { days: { type: "string" }, today: { type: "string" } },
+    usage: ADMIN_USAGE,
+    about: "What minimoji.com/admin/numbers shows, for a terminal a Minimoji admin signed in. numbers is a summary; overview, people and recent the page's JSON." },
 };
 
 function help() {
-  const width = Math.max(...Object.keys(COMMANDS).map((c) => c.length));
+  const shown = Object.entries(COMMANDS).filter(([, c]) => !c.hidden);
+  const width = Math.max(...shown.map(([name]) => name.length));
   return [
     `minimoji ${VERSION}: Mini avatars from the terminal`,
     "",
     "Usage: minimoji <command> [options]",
     "",
-    ...Object.entries(COMMANDS).map(([name, c]) => `  ${name.padEnd(width)}  ${c.about}`),
+    ...shown.map(([name, c]) => `  ${name.padEnd(width)}  ${c.about}`),
     "",
     "Every command takes:",
     "  --json        one JSON object on stdout (errors too: {\"error\"})",
