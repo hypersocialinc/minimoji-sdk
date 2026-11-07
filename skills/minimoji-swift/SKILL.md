@@ -662,6 +662,13 @@ struct DashSaysHey: View {
   `await host.speak(audioFile:…)` (or `speak(line, audio:)`) returns `.ended` or `.stopped`, and
   cancelling its task stops the line. Never stop on `onDisappear`, which
   can fire after the next screen's `onAppear` and cut off its line.
+- **Pause and resume**: `host.pause()` holds the line where it is — the
+  sound, the mouth (held at that sample), the captions and the face; no cue
+  fires and the stall guard sleeps. `host.resume()` carries on from the
+  same time (`host.paused` says which). A pause is not an end: `speak`
+  keeps waiting. A new `say` or `stop()` clears it. A tap-to-pause:
+  `.onTapGesture { host.paused ? host.resume() : host.pause() }`. A tap
+  while a plain-audio say still builds does nothing (the line then plays).
 - **Audio session `.ambient` by default**: it mixes, respects the silent
   switch, and never ducks or interrupts the person's own audio.
   `MinimojiLinePlayer(audioSession: .leaveAlone)` keeps your session.
@@ -675,6 +682,9 @@ struct DashSaysHey: View {
   and a long line shrinks to fit, then truncates. VoiceOver announces each
   line once, and the moving words are hidden from it. They must survive
   large Dynamic Type (shrink a headline beside the head instead).
+  `highlight: .pink` draws the word being said in that colour at full
+  opacity (the web captions' `data-lit` accent); without it the lit word
+  is only the opaque one.
 - **Building a line yourself**, offline (to store or send it):
   `try SpeechLine.build(audioFile: url, words: words, letters: letters, mood: "happy")`
   (`MinimojiLive`), with `words` as `[SpeechLine.Word(text:start:end:)]`

@@ -164,7 +164,10 @@ space once it has finished.
 - **D.A.S.H.'s screen face** has the Kit's `crt` default (1); keep it, it is part of the character.
 - **Reduce Motion** (`UIAccessibility.isReduceMotionEnabled`, `accessibilityReduceMotion`): no slide of the head
   across the screen, no auto-advance after a slide the person didn't choose, captions crossfade.
-- **Pause** is the app's, on a tap of the head: `MinimojiLinePlayer` has only `stop()` today, so resume replays the
-  slide's line from its start (a navigation restarts it anyway). A real `pause()`/`resume()` is a Kit card.
+- **Pause** is the app's, on a tap of the head: `player.paused ? player.resume() : player.pause()` (any Kit after v12.2.0 has
+  `pause()`). The voice, lips and captions hold where they are and carry on from the same word; a pause is not an
+  end (no `onEnd`), so the deck never advances while paused. A navigation `say`s the
+  new slide (which clears the pause). For the lit word in the Kit's own captions, `MinimojiCaptions(player:,
+  highlight: accent)`; the `Bubble` above draws its own pill.
 - Lines and audio ship in the app bundle (or download once): decode every `slide<N>.json` before the show, as the
   web preloads every clip.
