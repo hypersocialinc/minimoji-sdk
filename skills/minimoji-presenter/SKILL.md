@@ -13,8 +13,13 @@ product intro, a few slides long, one voiced line per slide. The show moves on b
 pick the next slide. It ends on calls to action. Uses: landing pages, splash and intro screens, first-run
 onboarding in an app.
 
-savethis built this pattern by hand over about 80 iterations (D.A.S.H. presents savethis.ai). Every number and
-rule below is one of its lessons: **where this skill gives a number, a rule or an order, keep it.**
+savethis built this pattern by hand over about 80 iterations (D.A.S.H. presents savethis.ai), then redesigned
+its landing and iOS tour around it (Nov 2026, §9a). Every number and rule below is one of its lessons: **where this
+skill gives a number, a rule or an order, keep it.**
+
+**Two shapes.** A deck that *is* the page (a first-run intro, a dedicated tour: §8, §9), or a deck **inside a
+landing page**, which explains the product without playing and offers the show as a video (§9a). On a landing page,
+use §9a: a visitor who doesn't press play must still learn what the product does.
 
 - Not a conversation. For a head that answers a person turn by turn, or a host that talks over a whole app
   without slides, read the "A host that talks" section of `minimoji-web` (web) or `minimoji-swift` (iOS).
@@ -188,9 +193,13 @@ const at = sdk.wordTime(line, 'favorite', 1);          // when a word is said: a
 - **On a slide change, show the new slide's first phrase at once.** Never leave the old slide's last line up. The
   last phrase stays until the slide's hold ends (`captionAt` holds it).
 - **Reduced motion**: crossfade the captions; don't stream them.
-- **Bubble geometry that worked**: `bottom: calc(100% - var(--headTop) - 30px)`, centred on the head, so the head
-  overlaps its bottom edge; width **280–320 px** (phones **240–290 px**); text weight **700**, **17–19 px**. A dark
-  ink bubble on light slides and a **charcoal** (not white) one on dark slides, so it never matches a white button.
+- **The caption card tucks behind the head**, so the head overlaps its edge: above the head on the web
+  (`bottom: calc(100% - var(--headTop) - 30px)`, centred on it), below the chin on iOS when the headline sits
+  above the head. Width **280–320 px** (phones **240–290 px**); text weight **700**, **17–19 px**.
+- **Glassy and quiet, not solid.** A solid black card was the heaviest thing on screen and a white one stood out
+  too: use a translucent card with a white hairline (iOS: `.ultraThinMaterial`). Inside a dark CRT frame (§9a), a
+  dark plum card with a faint pink glow on the text. Never a card that matches a white button.
+- **When the line ends, fade the card out** (in a §9a frame) rather than filling it with the whole line.
 
 ## 7. Directing the character
 
@@ -245,8 +254,11 @@ skip.onclick = () => deck.skip();
   and starts slide 0. **Only a trusted click starts the show** (`event.isTrusted`).
 - **Before Play, slide 0 is a complete still page**: headline and character, nothing waiting to appear. Reveals
   tied to words stay hidden until the line plays them.
-- **Pause**: a click anywhere on the deck (except your own controls) or **space**. The paused control moves to a
-  top corner so it never covers the headline. Resume from the same click, space or control.
+- **Pause**: a click anywhere on the deck (except your own controls), a **tap on the presenter**, or **space**.
+  The same tap continues from where it stopped (the web player follows the `<audio>`, so pausing it pauses the line;
+  for Swift see `swift/README.md`). The paused control moves to a top corner so it never covers the headline.
+- **Focus follows the keyboard only.** Move focus to the presenter after a keyboard activation (`event.detail ===
+  0`), never after a mouse click: a click left a focus ring around the head for the whole show.
 - **Navigation**: arrows sit **outside** the card on wide screens and are hidden on phones; pagination dots are
   always visible; **←/→** work; any navigation restarts that slide's line. Forward (→, the arrow, a dot) goes
   where the deck would (`next`, then the ending, never back round to slide 0) and **never past a step waiting for
@@ -276,6 +288,31 @@ skip.onclick = () => deck.skip();
 - **Gotcha**: a flex column with `flex-wrap: wrap` and a `max-height` wraps back into a row (a phone footer did).
 - **Gotcha**: don't name a class `.app` or `.pop` inside a bigger page; the starter prefixes its own with `pd-`.
 
+### 9a. On a landing page: explain first, play inside a frame
+
+savethis's redesign (savethis PRs #178, #182, #184 web, #187 iOS) after a visitor said "I didn't realize I had to
+click" and wanted "what it does" on the first screen.
+
+- **Explain first, play second.** The first screen says what the product does without playing anything: a headline
+  and **one** line. No step cards, no flow diagrams ("so much text"). The show is optional depth.
+- **Frame the show as a video.** A small Play pill reads as decoration. A screen with a **big centred play button**
+  and a **duration badge** (`0:40`) reads as "press me". For D.A.S.H., a CRT on standby: scanlines, vignette, a slow
+  rolling band, an occasional flicker, a blinking READY. The button sits dead centre.
+- **The presenter invites the click.** It starts centred, scoots aside to make room for the play button, looks at
+  it, and its bubble says "Watch the tour with me!".
+- **The show plays inside the frame**, never by replacing the page. Play powers the screen on (it collapses to a
+  line, then opens out) and grows it to fill the card; slides render inside, with a quick channel-change flash
+  between them. At the end it shrinks back to standby and the presenter asks "Watch it again?".
+- **A fixed slide shape**: **16:10**, capped at the window height. Never stretch it to fill a tall viewport.
+- **Effects at the edges, content clean.** A full-screen tint made the slides' UI hard to read: keep content near
+  true colour, put the tint and vignette at the rim, and scanlines at about **18%** opacity.
+- **Phones: a big presenter.** About **2×** the §9 size while it talks (savethis's 190 px box was too small); on iOS
+  it grows **×1.35** into the caption's space once it has finished.
+- **The doors stay visible** beside the frame (App Store, Connect, your calls to action): large, equal width. The
+  presenter glances at one when it is hovered.
+- Reference: savethis `web/app/_components/landing/DashDeck.tsx`, `web/app/dash-deck.css`,
+  `ios/SaveThis/Views/Onboarding/DashHost.swift`.
+
 ### React (`react/PresenterDeck.tsx`)
 
 The same engine as a client component on `@minimoji/react`: `<MinimojiStage>` + `<MinimojiHead>` for the head,
@@ -302,6 +339,8 @@ pager, the one-phrase bubble with the lit word, waiting steps that show the app'
 - Never draw the character by hand or as an SVG stand-in: use the SDK head, with a still image while it loads.
 - Never print or log a voice or API key.
 - Never put the calls to action in a strip under the deck.
+- Never tint the whole slide: effects stay at the rim, content stays near true colour.
+- Never move focus to the presenter after a mouse click.
 - Never render form controls or keep answers inside the deck engine: a waiting step's UI and data are the host's.
 
 ## 12. Checklist before you ship

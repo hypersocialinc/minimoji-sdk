@@ -152,7 +152,10 @@ struct IntroScreen: View {
 
 `Bubble` reads `player.line?.captions` and `player.captionTime`: the caption whose span holds the time (the last
 one after the line ends), its words with the one being said in a pill, at most two lines, text weight 700 at 17 pt,
-a dark ink bubble (charcoal on a dark slide). `override` shows a waiting step's prompt or nudge instead.
+on `.ultraThinMaterial` with a white hairline, tucked under the head's chin when the headline sits above it.
+`override` shows a waiting step's prompt or nudge instead. The 190 pt head is the full-screen intro's size; on a
+signed-out tour (§9a of the skill) make it about twice that while it talks and grow it ×1.35 into the caption's
+space once it has finished.
 
 ## Where it differs from the web
 
@@ -161,6 +164,7 @@ a dark ink bubble (charcoal on a dark slide). `override` shows a waiting step's 
 - **D.A.S.H.'s screen face** has the Kit's `crt` default (1); keep it, it is part of the character.
 - **Reduce Motion** (`UIAccessibility.isReduceMotionEnabled`, `accessibilityReduceMotion`): no slide of the head
   across the screen, no auto-advance after a slide the person didn't choose, captions crossfade.
-- **Pause** is the app's: `player.stop()` and replay the slide's line on resume (a navigation restarts it anyway).
+- **Pause** is the app's, on a tap of the head: `MinimojiLinePlayer` has only `stop()` today, so resume replays the
+  slide's line from its start (a navigation restarts it anyway). A real `pause()`/`resume()` is a Kit card.
 - Lines and audio ship in the app bundle (or download once): decode every `slide<N>.json` before the show, as the
   web preloads every clip.
