@@ -960,7 +960,11 @@ choose their own play control. These clips are public URL media.
 - Use the `.convex.site` origin, not `.convex.cloud`.
 - Service errors are `AvatarService.Fail` (transport errors such as
   `URLError`, and `CancellationError`, pass through as they are): `.rejected` (a `400`, e.g. no face in the
-  photo), `.limited(retryAfterMs: Int, String)` (a `429`), `.service(String)`, `.reply(status:body:)`. On an old service `characters()`,
+  photo), `.limited(retryAfterMs: Int, String)` (a `429`), `.service(String)`, `.reply(status:body:)`. One `400` is
+  its own type: a no-face photo the service says looks like one of its animals (a cat photo) throws
+  `AvatarService.SpeciesSuggested`, `description` the service's message and `character` the selection
+  (`{id: "cat"}`) to offer with one button; offer it, never switch for the person. `MinimojiEditorView` does
+  this itself when it `offersSpecies`. On an old service `characters()`,
   `head(for: CharacterSelection)` and `save(character:)` throw
   `AvatarService.SpeciesUnsupported`.
 
