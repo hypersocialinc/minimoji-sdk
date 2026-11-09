@@ -71,13 +71,22 @@ export async function generate(ctx, base, opts, out, words) {
 }
 
 /** the newest document version the service lists in GET /capabilities, or
- *  null when it lists none or cannot be reached: the version is a request
- *  for more inventory, never a reason a generation fails */
+ *  null when it lists none or cannot be read: the version is a request for
+ *  more inventory, never a reason a generation fails, but a read that
+ *  failed is said once on stderr, since the avatar then comes back at the
+ *  service's default version with less inventory. Only a service failure
+ *  (a CliError: unreachable, a non-200, not JSON) is forgiven; a bug throws */
 async function newestDocumentVersion(ctx, base) {
-  try {
-    const versions = (await call(ctx, base, "GET", "/capabilities")).data?.documentVersions;
-    return Array.isArray(versions) && versions.length && versions.every((v) => Number.isInteger(v)) ? Math.max(...versions) : null;
-  } catch { return null; }
+  let versions;
+  try { versions = (await call(ctx, base, "GET", "/capabilities")).data?.documentVersions; }
+  catch (error) {
+    if (!(error instanceof CliError)) throw error;
+    ctx.stderr(`note: could not read ${base}/capabilities (${error.message}); generating at the service's default document version\n`);
+    return null;
+  }
+  if (Array.isArray(versions) && versions.length && versions.every((v) => Number.isInteger(v))) return Math.max(...versions);
+  if (versions !== undefined) ctx.stderr(`note: ${base}/capabilities lists no usable documentVersions; generating at the service's default document version\n`);
+  return null;
 }
 
 /** a photo for /avatars/generate as base64, checked before anything is

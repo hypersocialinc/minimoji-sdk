@@ -101,6 +101,17 @@ test("generate asks for the newest document version the service lists: the textu
   } finally { await svc.close(); }
 });
 
+test("generate still runs when /capabilities is down, at the service's default version, and says so once", async () => {
+  const svc = await service({ "GET /capabilities": () => ({ status: 503, json: { error: "down" } }) });
+  try {
+    const ctx = await signedIn(svc);
+    const r = await run(ctx, ["generate", "red curls", "--base", svc.url, "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.deepEqual(svc.calls.find((c) => c.path === "/avatars/generate").body, { prompt: "red curls" });
+    assert.match(r.stderr, /could not read .*\/capabilities .*default document version/);
+  } finally { await svc.close(); }
+});
+
 test("a stored CLI key the service refuses is replaced once and the call retried", async () => {
   const svc = await service({ "POST /avatars/generate": [() => ({ status: 401, json: { error: "this key was revoked" } }), () => ({ json: { doc: DOC } })] });
   try {
