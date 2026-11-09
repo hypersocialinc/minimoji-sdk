@@ -30,6 +30,12 @@ export async function generate(ctx, base, opts, out, words) {
   const keeping = await signedIn(ctx, base);
   if (name && !keeping) throw new CliError("--name keeps the avatar in your library, which needs a signed-in terminal: run minimoji login first");
   const image = await readPhoto(ctx, opts.photo);
+  // a fresh document at the newest version the service offers: the textured
+  // hair and the v2 brows are only reachable from a prompt there. The
+  // service answers v1 to a bare request (an older client it knows nothing
+  // about), so the version is asked for by name; a service that lists none,
+  // or cannot be asked, is asked for nothing and answers as before
+  const documentVersion = await newestDocumentVersion(ctx, base);
 
   // each one is written as it is made: a failure later in a run (the day's
   // quota, the network) must not lose the avatars already paid for
@@ -39,7 +45,7 @@ export async function generate(ctx, base, opts, out, words) {
   for (let i = 0; i < count; i++) {
     if (count > 1) ctx.stderr(`generating ${i + 1} of ${count}…\n`);
     try {
-      const made = await keyedCall(ctx, base, opts, "POST", "/avatars/generate", { ...(prompt ? { prompt } : {}), ...(image ? { image } : {}), ...(seed != null ? { seed: seed + i } : {}) });
+      const made = await keyedCall(ctx, base, opts, "POST", "/avatars/generate", { ...(prompt ? { prompt } : {}), ...(image ? { image } : {}), ...(seed != null ? { seed: seed + i } : {}), ...(documentVersion != null ? { documentVersion } : {}) });
       const saved = await keyedCall(ctx, base, opts, "POST", "/avatars", { doc: made.doc });
       if (opts.out) await writeFile(numbered(resolve(ctx.cwd, opts.out), i, count), `${JSON.stringify(made.doc, null, 2)}\n`);
       let kept = null;
@@ -62,6 +68,16 @@ export async function generate(ctx, base, opts, out, words) {
     avatars.map((a) => [a.avatarKey, ...(a.name ? [`  name     ${a.name}`] : []), `  picture  ${a.picture}`, `  preview  ${a.preview}`, ...(a.notes ? [`  notes    ${oneLine(a.notes)}`] : [])].join("\n")).join("\n\n"));
   if (failure) { ctx.stderr(`minimoji: ${failure}\n`); return 1; }
   return unkept.length ? 1 : 0;
+}
+
+/** the newest document version the service lists in GET /capabilities, or
+ *  null when it lists none or cannot be reached: the version is a request
+ *  for more inventory, never a reason a generation fails */
+async function newestDocumentVersion(ctx, base) {
+  try {
+    const versions = (await call(ctx, base, "GET", "/capabilities")).data?.documentVersions;
+    return Array.isArray(versions) && versions.length && versions.every((v) => Number.isInteger(v)) ? Math.max(...versions) : null;
+  } catch { return null; }
 }
 
 /** a photo for /avatars/generate as base64, checked before anything is

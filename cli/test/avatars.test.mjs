@@ -53,14 +53,15 @@ test("generate: mints the CLI's secret key once, generates, saves, and prints ke
     const ctx = await signedIn(svc);
     const r = await run(ctx, ["generate", "red", "curls", "--count", "2", "--seed", "5", "--out", "kai.json", "--open", "--base", svc.url, "--json"]);
     assert.equal(r.code, 0, r.stderr);
-    assert.deepEqual(svc.calls.map((c) => `${c.method} ${c.path}`), ["POST /cli/keys", "POST /avatars/generate", "POST /avatars", "POST /cli/avatars", "POST /avatars/generate", "POST /avatars", "POST /cli/avatars"]);
-    assert.deepEqual(svc.calls[0].body, { kind: "secret", label: "minimoji CLI on test-host" });
-    assert.deepEqual(svc.calls[1].body, { prompt: "red curls", seed: 5 });
-    assert.equal(svc.calls[4].body.seed, 6, "each of a count gets its own seed");
-    assert.deepEqual(svc.calls[3].body, { avatarKey: KEY64, defaultName: "red-curls" }, "signed in, each one is kept in the library, named after the words");
-    assert.equal(svc.calls[3].auth, `Bearer mk_cli_${"c".repeat(40)}`, "the library takes the session, not the key");
-    assert.equal(svc.calls[1].auth, `Bearer ${sec()}`);
-    assert.deepEqual(svc.calls[2].body, { doc: DOC });
+    // the capabilities first: the newest document version the service lists is asked for by name (this fixture lists none, so nothing is sent)
+    assert.deepEqual(svc.calls.map((c) => `${c.method} ${c.path}`), ["GET /capabilities", "POST /cli/keys", "POST /avatars/generate", "POST /avatars", "POST /cli/avatars", "POST /avatars/generate", "POST /avatars", "POST /cli/avatars"]);
+    assert.deepEqual(svc.calls[1].body, { kind: "secret", label: "minimoji CLI on test-host" });
+    assert.deepEqual(svc.calls[2].body, { prompt: "red curls", seed: 5 });
+    assert.equal(svc.calls[5].body.seed, 6, "each of a count gets its own seed");
+    assert.deepEqual(svc.calls[4].body, { avatarKey: KEY64, defaultName: "red-curls" }, "signed in, each one is kept in the library, named after the words");
+    assert.equal(svc.calls[4].auth, `Bearer mk_cli_${"c".repeat(40)}`, "the library takes the session, not the key");
+    assert.equal(svc.calls[2].auth, `Bearer ${sec()}`);
+    assert.deepEqual(svc.calls[3].body, { doc: DOC });
     const [a] = r.json.avatars;
     assert.equal(a.avatarKey, KEY64);
     assert.equal(a.picture, `${svc.url}/avatars/${KEY64}.png?size=256`);
@@ -90,6 +91,16 @@ test("generate --photo sends the image as base64; a file that is not JPEG or PNG
   } finally { await svc.close(); }
 });
 
+test("generate asks for the newest document version the service lists: the textured hair is only reachable from a prompt there", async () => {
+  const svc = await service({ "GET /capabilities": () => ({ json: { ...CAPS, documentVersions: [1, 2, 3], bakeVersion: 12 } }) });
+  try {
+    const ctx = await signedIn(svc);
+    const r = await run(ctx, ["generate", "Snoop Dogg", "--base", svc.url, "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.deepEqual(svc.calls.find((c) => c.path === "/avatars/generate").body, { prompt: "Snoop Dogg", documentVersion: 3 });
+  } finally { await svc.close(); }
+});
+
 test("a stored CLI key the service refuses is replaced once and the call retried", async () => {
   const svc = await service({ "POST /avatars/generate": [() => ({ status: 401, json: { error: "this key was revoked" } }), () => ({ json: { doc: DOC } })] });
   try {
@@ -97,8 +108,8 @@ test("a stored CLI key the service refuses is replaced once and the call retried
     await signIn(ctx, svc.url, { secretKey: { key: sec("9"), prefix: prefixOf(sec("9")) } });
     const r = await run(ctx, ["generate", "a fox", "--base", svc.url]);
     assert.equal(r.code, 0, r.stderr);
-    assert.deepEqual(svc.calls.map((c) => c.path), ["/avatars/generate", "/cli/keys", "/avatars/generate", "/avatars", "/cli/avatars"]);
-    assert.equal(svc.calls[2].auth, `Bearer ${sec()}`);
+    assert.deepEqual(svc.calls.map((c) => c.path), ["/capabilities", "/avatars/generate", "/cli/keys", "/avatars/generate", "/avatars", "/cli/avatars"]);
+    assert.equal(svc.calls[3].auth, `Bearer ${sec()}`);
   } finally { await svc.close(); }
 });
 
