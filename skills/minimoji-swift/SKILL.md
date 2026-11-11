@@ -339,6 +339,12 @@ a Mac sheet has no detents. What differs:
 
 ### Several heads from one selfie
 
+The Kit editor does this for you: after a selfie with `imports: .kit(...)`,
+the likely heads sit in a strip under the stage (best first and on the
+stage), a tap shows another, Keep saves the one shown. Pass
+`offersSeveralHeads: false` to `MinimojiEditorView` for the one face. The
+rest of this section is for an app that runs its own selfie flow.
+
 To let the person pick their head from a few likely reads of one selfie
 (curly or wavy, brown or black), ask `generate` for candidates. It is the
 same single call and one generation of the day's quota:
