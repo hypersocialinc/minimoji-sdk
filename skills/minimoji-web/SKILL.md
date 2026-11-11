@@ -739,6 +739,11 @@ export function Reacting({ avatar }: { avatar: AvatarInput }) {
   `useLine` lines pop them at each cue. The PNGs load from
   `https://www.minimoji.com/emote-bursts/` (allow it in `img-src`), or
   `<MinimojiStage burstBase="/your/copy/">`.
+- **Face only**: `decorations={false}` (and `decorations: false` on the
+  vanilla bundle's `mountHeadPerformance`) shows no stickers (it overrides
+  `bursts`) and none of the rig's own effects: tears, sparkles, steam,
+  sleep Zs, notes, a screen face's effects. Expressions, blush, lip sync
+  (its sound arcs and lines too) and motion are unchanged. On by default.
 - **D.A.S.H.'s screen** shows the mood on the whole glass (the LEDs, their
   glow and the glass take the mood's colour: pink for happy, red for angry,
   blue for sad; neutral is the theme's own), and its eyes change shape for
@@ -880,6 +885,27 @@ the Swift Kit's `MinimojiBody`, or ask Minimoji.
 - A changed `performances`, `naturalTalk`, `drift` or `character` rebuilds
   the head: set them once, not per frame. `emotes` is live (no rebuild). A changed `avatar` whirls the new head in.
 - One voice at a time: stop the other heads' audio when one starts.
+
+### A baked head (a bake's GLB, no avatar document)
+
+When you hold a bake rather than a document (`GET /avatars/<key>.glb`, or
+bytes your server stored), draw it as it is:
+
+```js
+import { prepareBakedHead, buildBakedHead } from '@minimoji/react';
+const prepared = await prepareBakedHead({ url: glbUrl, sha256 });   // or bytes; once per file
+const head = buildBakedHead(prepared, { gaze: false });              // as many as you need
+```
+
+The vanilla bundle takes it as `mountHeadPerformance(el, { bakedHead: prepared })`
+(also per tile, `tiles[i].bakedHead`), `mountBakedHeadPerformance(el, { bakedHead })`,
+and `stage.setBakedHead(prepared)`. `prepareBakedHead` checks the file before
+parsing it (data only: no images, textures, external buffers or extensions
+beyond four material ones; 32 MB at most; the bundle's own bake version) and
+rejects a bad one; there is never a stand-in head. A URL is fetched with
+same-origin credentials (http(s) or a /path; pass bytes otherwise); account checks are your server's. Each head from one
+prepared file owns its geometry and materials; `prepared.dispose()` frees only
+the template.
 
 ## 9. Keys
 
