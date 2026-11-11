@@ -337,6 +337,26 @@ a Mac sheet has no detents. What differs:
   device engine (`LocalBaker`, JavaScriptCore on the Mac) for instant part
   previews. A runnable sample is `apps/mac-editor-sample` in the Minimoji repo.
 
+### Several heads from one selfie
+
+To let the person pick their head from a few likely reads of one selfie
+(curly or wavy, brown or black), ask `generate` for candidates. It is the
+same single call and one generation of the day's quota:
+
+```swift
+let made = try await service.generate(photo: jpegData, candidates: 4)   // 2–6
+for head in made.candidates {      // best first; made.candidates[0].doc is made.doc
+  // head.doc: a whole document to bake or open in the editor
+  // head.differs: ["hair.style"], the paths it changes from made.doc, for a label
+  // head.score: its likelihood among these heads (they sum to 1)
+}
+```
+
+`made.candidateSource` is `"decisions"` when the alternatives come from the
+decision model's runner-ups, `"single"` when the service answered another
+way and `made.doc` is the only head (show it alone). A sure read may offer
+fewer heads than asked. Bake each `head.doc` as any document (section 3).
+
 ## 6. Cue a gesture
 
 ```swift

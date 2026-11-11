@@ -893,6 +893,31 @@ Drawing a head needs no key. A key is for the service's HTTP API
 - The service URL is the deployment's `.convex.site` origin, never
   `.convex.cloud`.
 
+### Several heads from one selfie
+
+`POST /avatars/generate` with a publishable key makes a document from a
+selfie (`image`: base64 JPEG or PNG, downscaled to a 1024 px long edge) or
+a sentence (`prompt`). Add `candidates` (2–6) to get several likely heads to
+let the person pick from, at no extra cost: one call, one generation of the
+day's quota.
+
+```ts
+const res = await fetch(`${serviceUrl}/avatars/generate`, {
+  method: "POST",
+  headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+  body: JSON.stringify({ image: base64Jpeg, candidates: 4 }),
+});
+const { doc, candidates, candidateSource } = await res.json();
+// candidates: [{ doc, score, differs }], best first; candidates[0].doc equals doc.
+// differs: ["hair.style"], the paths a head changes from doc (for a label);
+// score: its likelihood among these heads (they sum to 1).
+// candidateSource: "decisions" (runner-ups of the read) or "single" (doc is the only head).
+```
+
+Render each `candidate.doc` with `<MinimojiHead avatar={candidate.doc} />`.
+A sure read may offer fewer heads than asked; without `candidates` the
+answer is `{doc, notes, changes, usage}` as before.
+
 ### Getting a key with `npx minimoji`
 
 In the app's folder:
