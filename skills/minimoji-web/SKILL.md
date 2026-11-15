@@ -1049,13 +1049,13 @@ to your app. You never ask for their email: they pick one on minimoji.com
 and your app gets that pick. The host's three lines:
 
 ```jsx
-import { MinimojiConnectButton, refreshMinimojiGrant } from '@minimoji/react';
+import { MinimojiConnectButton, loadMinimojiGrantHead, prepareBakedHead, refreshMinimojiGrant } from '@minimoji/react';
 
 // 1. show the button; the popup opens on the click
 <MinimojiConnectButton minimojiKey={process.env.NEXT_PUBLIC_MINIMOJI_KEY} service={process.env.NEXT_PUBLIC_MINIMOJI_SERVICE_URL}
   onConnected={({ grantId, avatarKey }) => saveForUser({ grantId, avatarKey })} />   // 2. store both against your user
 // 3. on launch, follow their edits and re-picks; null means they disconnected your app
-const now = await refreshMinimojiGrant({ service, key, grantId });   // { grantId, avatarKey, status } | null
+const now = await refreshMinimojiGrant({ service, key, grantId });   // { grantId, avatarKey, status, character } | null
 ```
 
 - One live grant per app and person: connecting again (another device, or the person reconnecting) replaces the grant, and the old id answers 410. On a 410, re-read the grant you stored before clearing it; another device may have saved a new one.
@@ -1068,6 +1068,27 @@ const now = await refreshMinimojiGrant({ service, key, grantId });   // { grantI
   when the popup is closed without an answer.
 - Show the head with `<MinimojiHeadPoster src={`${service}/avatars/${avatarKey}.png?size=256`} />`
   and fetch `${service}/avatars/${avatarKey}.json` to draw it live.
+- **A private character as their avatar.** At minimoji.com/me the person can
+  pick one of their own private characters (made with `minimoji characters`)
+  for your app. The refresh then carries `character: { id, name, revision,
+  bakeVersion, speech, sha256 }` (null otherwise) and `avatarKey` stays their
+  Mini avatar. The character's file is private, so there is no public URL:
+  fetch it from the grant with your key and load it like any baked head:
+  ```js
+  const now = await refreshMinimojiGrant({ service, key, grantId });
+  const bytes = now?.character ? await loadMinimojiGrantHead({ service, key, grantId }) : null;   // GET /connect/grants/<id>/head
+  if (bytes) {
+    const head = await prepareBakedHead(bytes, { sha256: now.character.sha256 });
+    // mount `head` as you mount any prepared baked head
+  } // else show avatarKey as before (no character, or it came off between the two calls)
+  ```
+  Pass `etag: lastSha256` to get `'unchanged'` (a 304) while it is the same;
+  `null` means it is no longer worn (switched back, archived, deleted). If
+  the head changed between the refresh and the fetch, the sha256 check fails:
+  refresh again, and show `avatarKey` meanwhile. Never cache
+  the bytes anywhere shared, and never send them on: they are the person's.
+  An app on an older SDK keeps showing the Mini avatar, and /me tells the
+  person so.
 - An avatar made in your own editor, which your server saves with
   `POST /avatars`: `addToMinimojiLibrary({ service, key, grantId, avatarKey })`
   puts it in their library and picks it for your app (a 403 if they said no

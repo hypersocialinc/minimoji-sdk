@@ -946,6 +946,23 @@ user.minimoji = try await service.refresh(user.minimoji!.grantId)
   minimoji.com/developers/keys) is the app name the person sees.
 - Show the head with `head(forKey: connected.avatarKey)` or
   `renderURL(for:size:)`.
+- **A private character as their avatar.** The person can pick one of their
+  own private characters for your app at minimoji.com/me. `refresh` then
+  answers `connected.character` (`ConnectedCharacter`: `id`, `name`,
+  `revision`, `bakeVersion`, `speech`, `sha256`), and `avatarKey` stays their
+  Mini avatar. Show the character, and go back to `head(forKey:)` when it is
+  nil again (they switched back):
+  ```swift
+  let head = if let c = connected.character,
+    let worn = try await service.characterHead(forGrant: connected.grantId, expected: c.sha256) { worn }
+    else { try await service.head(forKey: connected.avatarKey) }
+  ```
+  The file is private: it comes from the grant with your key, never from a
+  public URL, and the Kit keeps it in memory only. Reload when `sha256`
+  changes. Nil from `characterHead` means it is no longer worn (switched back,
+  archived, deleted). A masked character (`speech == "indicator"`) talks with
+  sound arcs on its own. A Kit older than this one keeps showing the Mini
+  avatar, and /me tells the person so.
 - An avatar your server saved with `POST /avatars`:
   `service.addToLibrary(grantId, avatarKey:)` puts it in their library and
   picks it for your app (`.service` with a 403's words if they said no).
