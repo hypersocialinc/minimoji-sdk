@@ -613,6 +613,73 @@ export function AgentReply({ stream }: { stream: () => AsyncIterable<string> }) 
   until another `speak` names one, and a reply already playing keeps its own).
   The stage draws its own frames when you draw none.
 
+### Talking with your voice (live mic)
+
+The person talks into their mic and the head's mouth follows, live. The
+analyser runs in the page (the same live viseme analyser as MinimojiKit), so
+there is no key, no network, and nothing is played, stored or sent.
+
+```tsx
+'use client';
+import { useRef } from 'react';
+import { MinimojiStage, MinimojiHead, useLiveMic } from '@minimoji/react';
+
+export function TalkAsYourAvatar({ avatar }: { avatar: object }) {
+  const anchor = useRef<HTMLDivElement>(null);
+  const mic = useLiveMic();
+  return (
+    <>
+      <button type="button" onClick={() => (mic.live ? mic.stop() : mic.start())}>
+        {mic.live ? 'Stop' : mic.state === 'starting' ? 'Opening the mic…' : 'Talk'}
+      </button>
+      {mic.error && <p>{mic.error.code === 'denied' ? 'Allow the microphone to talk as your avatar.' : mic.error.message}</p>}
+      <div ref={anchor} data-minimoji="loading" style={{ position: 'relative', width: 160, height: 160 }} />
+      <MinimojiStage>
+        <MinimojiHead avatar={avatar} anchor={anchor} expression="happy"
+          performance={mic.live ? mic.performance : null} />
+      </MinimojiStage>
+    </>
+  );
+}
+```
+
+- **`start()` from a click or a key press.** Browsers only run audio from a
+  user gesture, and Safari only from one made in the same tick: call it in the
+  handler, not after an `await`. It needs `https://` (or localhost). The
+  hook's `start()` resolves `true` once live and `false` otherwise (no catch
+  needed): the failure is `mic.error` (and `onError`'s), an `Error` whose
+  `code` is `denied`, `no-device`, `busy` (another app has the mic),
+  `blocked` (the browser kept audio off: not from a gesture), `unsupported` or
+  `failed`. Without the hook, `start()` and `liveMic()` reject with it.
+  A mic that goes away mid-talk stops it with `ended`
+  (`mic.on('error', fn)` hears every failure).
+- **Voice processing is on:** echo cancelling, noise suppression and auto gain
+  (`LIVE_MIC_CONSTRAINTS`). `useLiveMic({ deviceId })` picks a mic from
+  `enumerateDevices()`, from the next start.
+- **The head between words is its own:** `performance` is the mouth while you
+  talk and inactive in the silences, so the gaze and idle carry on. Pass
+  `mic.live ? mic.performance : null` so `look` is back when it stops.
+- **A meter:** `mic.level()` is how loud the voice is now, 0..1; read it in
+  your own animation frame.
+- **Unmounting stops the mic.** Faces (`expression`, `listening`) compose with
+  it as with a line.
+- **No React:** `createLiveMicSession()` from `@minimoji/react` is the same
+  session (`start`, `stop`, `performance()`, `level()`, `on`). On the vanilla
+  bundle (`/sdk/minimoji-heads.js` on minimoji.com, once the site deploys):
+
+  ```js
+  import { mountHeadPerformance, liveMic } from 'https://minimoji.com/sdk/minimoji-heads.js';
+  const stage = mountHeadPerformance(el, { avatar });
+  talk.onclick = async () => {
+    const mic = await liveMic();          // from the click; rejects with a coded Error
+    stage.setPerformance(mic);            // the head talks with your voice; the stage draws its own frames
+    stop.onclick = () => { mic.stop(); stage.setPerformance(null); };
+  };
+  ```
+
+  `stage.setPerformance(source, id)` takes any live source (anything with
+  `performance()`); `id` picks a tile.
+
 ### Emotes with speech
 
 Two ways, pick one per head:
