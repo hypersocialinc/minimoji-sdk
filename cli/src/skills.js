@@ -6,7 +6,8 @@
 // a `minimoji-source:` frontmatter line, which is how `update` tells a stale
 // copy from a current one.
 import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
+import { createHash } from "node:crypto";
 import { CliError } from "./service.js";
 import { table } from "./auth.js";
 
@@ -88,11 +89,74 @@ export function stampSource(text, sha) {
   return fm ? `${fm[0]}${line}\n${text.slice(fm[0].length)}` : `---\n${line}\n---\n\n${text}`;
 }
 
+// what minimoji wrote into a skill folder, file by file: an update replaces the folder only when every
+// file is still as minimoji wrote it, so a creator's own edits are never overwritten silently
+const MANIFEST = ".minimoji-skill.json";
+const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+
+// what an OS or an editor drops into any folder: never a creator's edit
+const JUNK = /(^|\/)(\.DS_Store|Thumbs\.db|desktop\.ini|\.[^/]*\.sw[a-p]|[^/]*~|\.#[^/]*)$/;
+
+async function filesUnder(root, at = root) {
+  const out = [];
+  for (const e of await readdir(at, { withFileTypes: true }).catch(() => [])) {
+    const p = join(at, e.name);
+    if (e.isDirectory()) out.push(...await filesUnder(root, p));
+    else out.push(relative(root, p).split(sep).join("/"));
+  }
+  return out;
+}
+
+/** what minimoji wrote for a pre-manifest copy: the files at its stamped commit (SKILL.md stamped) */
+async function legacyManifest(ctx, target, name) {
+  const text = await readFile(join(target, "SKILL.md"), "utf8").catch(() => null);
+  const m = text?.match(SOURCE_LINE);
+  if (!m || !OURS.has(m[1])) return null;
+  // ours, but what was written cannot be rebuilt (the commit or a file is gone, or the fetch fails):
+  // unverifiable, so it is treated as changed — refused unless --force, never replaced silently
+  const unverifiable = { unverifiable: true };
+  try {
+    const files = (await availableSkills(ctx, m[2])).get(name);
+    if (!files) return unverifiable;
+    const written = {};
+    for (const file of files) {
+      const res = await get(ctx, `${raw(ctx)}/${SKILLS_REPO}/${m[2]}/skills/${name}/${file}`, "*/*");
+      const bytes = Buffer.from(await res.arrayBuffer());
+      written[file] = hash(file === "SKILL.md" ? Buffer.from(stampSource(bytes.toString("utf8"), m[2])) : bytes);
+    }
+    return { files: written, legacyRef: m[2] };
+  } catch { return unverifiable; }
+}
+
+/** the files in an installed skill that differ from what minimoji wrote (edited, added or removed);
+ *  a copy from before the manifest existed answers [] (nothing to compare against) */
+export async function modifiedFiles(target, { ctx = null, name = null } = {}) {
+  let manifest = JSON.parse(await readFile(join(target, MANIFEST), "utf8").catch(() => "null"));
+  // a copy from before the manifest existed: rebuild what minimoji wrote from the commit it is stamped with
+  if (!manifest?.files && ctx && name) manifest = await legacyManifest(ctx, target, name);
+  if (manifest?.unverifiable) return ["(an older copy minimoji cannot check against the commit it came from)"];
+  if (!manifest?.files) return [];
+  const changed = [];
+  const now = (await filesUnder(target)).filter((f) => f !== MANIFEST && !JUNK.test(f));
+  for (const f of now) {
+    const want = manifest.files[f];
+    if (!want) { changed.push(`${f} (added)`); continue; }
+    let bytes = await readFile(join(target, f));
+    // a legacy copy's stamp line may name the repo's old name: compare the content, not the provenance line
+    if (manifest.legacyRef && f === "SKILL.md") bytes = Buffer.from(stampSource(bytes.toString("utf8"), manifest.legacyRef));
+    if (hash(bytes) !== want) changed.push(f);
+  }
+  for (const f of Object.keys(manifest.files)) if (!now.includes(f)) changed.push(`${f} (removed)`);
+  return changed;
+}
+
 /** every file is fetched before the old copy is touched, and the stamped
  *  SKILL.md is written last: a failed download leaves the old skill whole,
  *  and a half-written one is never stamped current */
-async function install(ctx, dir, name, files, sha) {
+async function install(ctx, dir, name, files, sha, { force = false } = {}) {
   const target = join(dir, name);
+  const changed = await modifiedFiles(target, { ctx, name });
+  if (changed.length && !force) throw new CliError(`${target} has changes you made (${changed.slice(0, 5).join(", ")}${changed.length > 5 ? ", …" : ""}); nothing was replaced. Move them aside, or pass --force to replace them`);
   const fetched = [];
   for (const file of files) {
     const res = await get(ctx, `${raw(ctx)}/${SKILLS_REPO}/${sha}/skills/${name}/${file}`, "*/*");
@@ -100,11 +164,15 @@ async function install(ctx, dir, name, files, sha) {
   }
   const skillMD = fetched.find(([f]) => f === "SKILL.md");
   await rm(target, { recursive: true, force: true });
+  const written = {};
   for (const [file, bytes] of [...fetched.filter((e) => e !== skillMD), skillMD]) {
     const path = join(target, file);
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, file === "SKILL.md" ? stampSource(bytes.toString("utf8"), sha) : bytes);
+    const out = file === "SKILL.md" ? Buffer.from(stampSource(bytes.toString("utf8"), sha)) : bytes;
+    await writeFile(path, out);
+    written[file] = hash(out);
   }
+  await writeFile(join(target, MANIFEST), `${JSON.stringify({ source: `${SKILLS_REPO}@${sha}`, files: written }, null, 2)}\n`);
   return { name, dir: target, ref: sha };
 }
 
@@ -139,7 +207,7 @@ export async function addSkills(ctx, opts, names) {
   const dir = join(/* turbopackIgnore: true */ ctx.cwd, AGENT_DIRS[agent]);
   const installed = [];
   for (const name of wanted) await refuseForeign(join(/* turbopackIgnore: true */ dir, name));
-  for (const name of wanted) installed.push(await install(ctx, dir, name, available.get(name), sha));
+  for (const name of wanted) installed.push(await install(ctx, dir, name, available.get(name), sha, { force: !!opts.force }));
   return { agent, ref: sha, installed };
 }
 
@@ -166,10 +234,17 @@ export async function skills(ctx, _base, opts, out, [sub, ...names]) {
     if (!installed.length) return out({ ref: sha, updated: [], current: [] }, "No Minimoji skills installed here; minimoji skills add installs them.");
     const available = await availableSkills(ctx, sha);
     const updated = [], current = [], gone = [];
+    const todo = installed.filter((s) => s.ref !== sha && available.has(s.name));
+    // every skill is checked BEFORE any is replaced: an edited one stops the update with nothing changed
+    if (!opts.force) {
+      const edited = [];
+      for (const s of todo) { const changed = await modifiedFiles(s.dir, { ctx, name: s.name }); if (changed.length) edited.push(`${s.name} for ${s.agent} (${changed.slice(0, 3).join(", ")}${changed.length > 3 ? ", …" : ""})`); }
+      if (edited.length) throw new CliError(`nothing was updated: you changed ${edited.join("; ")}. Move your changes aside, or pass --force to replace them`);
+    }
     for (const s of installed) {
       if (s.ref === sha) current.push(s);
       else if (!available.has(s.name)) gone.push(s);
-      else updated.push({ ...(await install(ctx, dirname(s.dir), s.name, available.get(s.name), sha)), agent: s.agent, from: s.ref });
+      else updated.push({ ...(await install(ctx, dirname(s.dir), s.name, available.get(s.name), sha, { force: true })), agent: s.agent, from: s.ref });
     }
     const lines = [
       ...updated.map((s) => `Updated ${s.name} for ${s.agent}: ${sha7(s.from)} → ${sha7(s.ref)}`),

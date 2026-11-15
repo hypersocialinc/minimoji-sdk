@@ -11,6 +11,7 @@ import { init } from "./init.js";
 import { avatars, status } from "./library.js";
 import { CliError, resolveBase } from "./service.js";
 import { skills } from "./skills.js";
+import { characters } from "./characters.js";
 import { lines } from "./lines.js";
 import { serve } from "./mcp.js";
 import { say, voice } from "./voice.js";
@@ -37,8 +38,16 @@ const COMMANDS = {
   init: { run: init, options: { platform: { type: "string" }, plist: { type: "string" }, force: { type: "boolean" }, "with-skill": { type: "boolean" }, agent: { type: "string" }, ref: { type: "string" } },
     usage: "minimoji init [--platform swift|web] [--plist <path>] [--force] [--with-skill]",
     about: "Mint a publishable key for the app in this folder and write it where the app reads config (.env.local, Info.plist). Never a secret key." },
-  skills: { run: skills, options: { agent: { type: "string" }, ref: { type: "string" } },
-    usage: "minimoji skills list | add [name…] | update [name…] [--agent claude|codex] [--ref <git ref>]",
+  // hidden from --help until @minimoji/authoring is released (the roadmap card's public-release slice)
+  characters: { run: characters, usageExit: 2, hidden: true,
+    options: { project: { type: "string" }, template: { type: "string" }, id: { type: "string" }, target: { type: "string" }, out: { type: "string" },
+      port: { type: "string" }, host: { type: "string" }, runtime: { type: "string" }, "allow-remote": { type: "boolean" }, "no-browser": { type: "boolean" }, "no-install": { type: "boolean" },
+      visibility: { type: "string" }, revision: { type: "string" }, label: { type: "string" }, days: { type: "string" }, "token-out": { type: "string" }, confirm: { type: "string" }, undo: { type: "boolean" }, up: { type: "string" }, "max-verts": { type: "string" }, force: { type: "boolean" }, kind: { type: "string" }, part: { type: "string" }, author: { type: "string" }, license: { type: "string" }, references: { type: "string" }, evidence: { type: "string" },
+      to: { type: "string" }, "expect-account": { type: "string" }, pack: { type: "string" }, env: { type: "string" }, variant: { type: "string" }, "stock-voice": { type: "string" } },
+    usage: "minimoji characters create <dir> --template human|creature|robot [--id you/name] [--no-install]\n       minimoji characters dev [--project <dir>] [--port n] [--no-browser]\n       minimoji characters validate [--project <dir>] [--target web|swift|hyperdecks]   (compiles source: trusted local code)\n       minimoji characters validate <pack dir> [--target …]   (a pack: data only, never runs code)\n       minimoji characters pack [--project <dir>] --out <dir> [--target web|swift|hyperdecks]\n       minimoji characters unpack <pack dir> <new dir>   (local restore: the pack's source, byte-verified; runs nothing)\n       minimoji characters mesh <file.obj|.glb> --out <file.mesh.json> [--up y|z] [--max-verts n] [--force]   (prepare a generated mesh: data only)\n       minimoji characters contribute --kind character|part [--part <id>] --author \"<name>\" --license <id> --evidence <dir> [--references exclude|licensed] --out <dir>   (a local review bundle; uploads nothing)\n       minimoji characters save <pack dir> | list | revisions <id> | pull <id> --out <dir> [--revision n]\n       minimoji characters restore <id> --revision n | archive <id> [--undo] | delete <id> --confirm <id>\n       minimoji characters grant <id> --label <app> --token-out <file> [--revision n|current] [--days n]   (lasts until revoked unless --days) | grants <id> | revoke <grant id>\n       minimoji characters export <id> --to hyperdecks --expect-account <id> --pack <pack id> [--revision n] [--variant v] [--env prod|dev] [--stock-voice stock:…]   (needs the Hyperdecks CLI 0.9.18+, a stable release)",
+    about: "Make your own character (human, creature, robot) from source: scaffold, preview, validate, pack. Local, no account." },
+  skills: { run: skills, options: { agent: { type: "string" }, ref: { type: "string" }, force: { type: "boolean" } },
+    usage: "minimoji skills list | add [name…] | update [name…] [--agent claude|codex] [--ref <git ref>] [--force]",
     about: "Install the Minimoji agent skills into this project (.claude/skills or .agents/skills), so a coding agent knows the SDK." },
   generate: { run: generate, options: { ...KEY, ...SITE, name: { type: "string" }, photo: { type: "string" }, count: { type: "string" }, seed: { type: "string" }, out: { type: "string" }, open: { type: "boolean" } },
     usage: 'minimoji generate "red curls, round glasses" [--name kai] [--photo me.jpg] [--count n] [--seed n] [--out kai.json] [--open]',
@@ -107,7 +116,7 @@ export async function main(argv, ctx) {
     try {
       parsed = parseArgs({ args: rest, options: { ...GLOBAL, ...command.options }, allowPositionals: true, strict: true });
     } catch (error) {
-      throw new CliError(`${error.message.replace(/\. To specify a positional argument.*$/s, "")}; usage: ${command.usage}`);
+      throw Object.assign(new CliError(`${error.message.replace(/\. To specify a positional argument.*$/s, "")}; usage: ${command.usage}`), { exitCode: command.usageExit ?? 1 });
     }
     const opts = parsed.values;
     const out = (data, human) => {
@@ -121,7 +130,7 @@ export async function main(argv, ctx) {
     const message = (error instanceof CliError ? error.message : `unexpected error: ${error?.message ?? error}`).split("\n")[0];
     if (wantsJSON) ctx.stdout(`${JSON.stringify({ error: message })}\n`);
     ctx.stderr(`minimoji: ${message}\n`);
-    return 1;
+    return error?.exitCode ?? 1;
   }
 }
 

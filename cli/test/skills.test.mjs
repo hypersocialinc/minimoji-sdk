@@ -97,6 +97,8 @@ test("a copy stamped with the repo's old name, minimoji-skills, is still ours: u
     assert.deepEqual(r.json.updated.map((s) => [s.from, s.ref]), [[OLD, NEW]]);
     assert.equal(await readFile(path, "utf8"), stampSource(SKILL("new"), NEW));
     assert.match(await readFile(path, "utf8"), /minimoji-source: hypersocialinc\/minimoji-sdk@/);
+    // an install from before the file manifest existed: an old-name stamp and no manifest
+    await rm(join(ctx.cwd, ".claude/skills/minimoji-swift/.minimoji-skill.json"));
     await writeFile(path, SKILL("old").replace("---\n\n", `minimoji-source: hypersocialinc/minimoji-skills@${OLD}\n---\n\n`));
     assert.equal((await run(ctx, ["skills", "add"])).code, 0, "not taken for someone's own skill");
     // only Minimoji's own repos count: a fork of the same name is someone else's
@@ -197,5 +199,87 @@ test("a folder skill (minimoji-presenter) installs whole: skills list shows it, 
     assert.match(await readFile(join(dir, "SKILL.md"), "utf8"), new RegExp(`minimoji-source: ${SKILLS_REPO}@${NEW}`));
     const all = await run(ctx, ["skills", "add", "--json"]);
     assert.deepEqual(all.json.installed.map((s) => s.name).sort(), ["minimoji-presenter", "minimoji-swift", "minimoji-web"], "no name installs all three");
+  } finally { await svc.close(); }
+});
+
+test("an update never overwrites a skill file the creator changed, unless --force; untouched copies update", async () => {
+  const svc = await github(OLD);
+  try {
+    const ctx = await ctxFor(svc, [".claude/"]);
+    assert.equal((await run(ctx, ["skills", "add", "minimoji-swift"])).code, 0);
+    const dir = join(ctx.cwd, ".claude/skills/minimoji-swift");
+    const manifest = JSON.parse(await readFile(join(dir, ".minimoji-skill.json"), "utf8"));
+    assert.equal(manifest.source, `${SKILLS_REPO}@${OLD}`);
+    await svc.close();
+    const svc2 = await github(NEW);
+    const ctx2 = { ...ctx, env: { ...ctx.env, MINIMOJI_SKILLS_API: svc2.url, MINIMOJI_SKILLS_RAW: svc2.url } };
+    try {
+      await writeFile(join(dir, "SKILL.md"), (await readFile(join(dir, "SKILL.md"), "utf8")) + "\nMy own house rules.\n");
+      const refused = await run(ctx2, ["skills", "update"]);
+      assert.equal(refused.code, 1);
+      assert.match(refused.stderr, /nothing was updated: you changed minimoji-swift for claude \(SKILL\.md\)/);
+      assert.match(await readFile(join(dir, "SKILL.md"), "utf8"), /My own house rules/, "the creator's edit is kept");
+      const forced = await run(ctx2, ["skills", "update", "--force", "--json"]);
+      assert.equal(forced.code, 0, forced.stderr);
+      assert.equal(await readFile(join(dir, "SKILL.md"), "utf8"), stampSource(SKILL("new"), NEW));
+    } finally { await svc2.close(); }
+  } finally { await svc.close().catch(() => {}); }
+});
+
+test("editor and OS junk is not an edit; an update checks every skill before replacing any; a pre-manifest copy keeps its edits", async () => {
+  const svc = await github(OLD);
+  try {
+    const ctx = await ctxFor(svc, [".claude/"]);
+    assert.equal((await run(ctx, ["skills", "add", "minimoji-swift"])).code, 0);
+    const dir = join(ctx.cwd, ".claude/skills/minimoji-swift");
+    await svc.close();
+    const svc2 = await github(NEW);
+    const ctx2 = { ...ctx, env: { ...ctx.env, MINIMOJI_SKILLS_API: svc2.url, MINIMOJI_SKILLS_RAW: svc2.url } };
+    try {
+      // junk an OS or editor drops is not the creator's edit
+      await writeFile(join(dir, ".DS_Store"), "x"); await writeFile(join(dir, ".SKILL.md.swp"), "x"); await writeFile(join(dir, "SKILL.md~"), "x");
+      const up = await run(ctx2, ["skills", "update", "--json"]);
+      assert.equal(up.code, 0, up.stderr);
+      // a copy from BEFORE the manifest existed, with an edit: still refused (compared with its stamped commit)
+      await rm(join(dir, ".minimoji-skill.json"));
+      await writeFile(join(dir, "SKILL.md"), (await readFile(join(dir, "SKILL.md"), "utf8")) + "\nmine\n");
+      const svc3 = await github(OLD);   // main moves back to OLD: the copy (at NEW) is stale again
+      try {
+        const ctx3 = { ...ctx, env: { ...ctx.env, MINIMOJI_SKILLS_API: svc3.url, MINIMOJI_SKILLS_RAW: svc3.url } };
+        // the server for svc3 knows NEW's files too (github() serves both), so the legacy check can rebuild them
+        const refused = await run(ctx3, ["skills", "update"]);
+        assert.equal(refused.code, 1, refused.stdout);
+        assert.match(refused.stderr, /nothing was updated: you changed minimoji-swift/);
+        assert.match(await readFile(join(dir, "SKILL.md"), "utf8"), /mine/);
+      } finally { await svc3.close(); }
+    } finally { await svc2.close(); }
+  } finally { await svc.close().catch(() => {}); }
+});
+
+test("skills add over an older (pre-manifest) copy keeps its edits and extra files; an unverifiable copy is refused too", async () => {
+  const svc = await github(NEW);
+  try {
+    const ctx = await ctxFor(svc, [".claude/"]);
+    const dir = join(ctx.cwd, ".claude/skills/minimoji-swift");
+    await mkdir(dir, { recursive: true });
+    // an install from before the manifest: stamped at OLD, then edited, plus the creator's own notes
+    await writeFile(join(dir, "SKILL.md"), stampSource(SKILL("old"), OLD) + "\nmy edit\n");
+    await writeFile(join(dir, "custom-notes.md"), "mine");
+    const refused = await run(ctx, ["skills", "add", "minimoji-swift"]);
+    assert.equal(refused.code, 1);
+    assert.match(refused.stderr, /changes you made/);
+    assert.match(await readFile(join(dir, "SKILL.md"), "utf8"), /my edit/);
+    assert.equal(await readFile(join(dir, "custom-notes.md"), "utf8"), "mine");
+    // unchanged older copy: migrates
+    await rm(join(dir, "custom-notes.md"));
+    await writeFile(join(dir, "SKILL.md"), stampSource(SKILL("old"), OLD));
+    assert.equal((await run(ctx, ["skills", "add", "minimoji-swift"])).code, 0);
+    // an older copy stamped at a commit the repo no longer has: cannot be checked, so it is refused
+    await rm(join(dir, ".minimoji-skill.json"));
+    await writeFile(join(dir, "SKILL.md"), stampSource(SKILL("old"), "3".repeat(40)));
+    const unknown = await run(ctx, ["skills", "add", "minimoji-swift"]);
+    assert.equal(unknown.code, 1);
+    assert.match(unknown.stderr, /cannot check/);
+    assert.equal((await run(ctx, ["skills", "add", "minimoji-swift", "--force"])).code, 0, "--force replaces it");
   } finally { await svc.close(); }
 });
