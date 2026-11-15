@@ -485,6 +485,22 @@ func performanceSnapshot(at hostTime: TimeInterval) -> AvatarPerformanceSnapshot
 - `LiveVisemes` opens no microphone and no audio session, and records or
   sends nothing (only `MinimojiLinePlayer` sets `.ambient`, and you can opt
   out).
+- **The speaker's own mic: use `LiveMic`, never a tap of your own.** An
+  input tap hands over ~100 ms at a time and the mouth trails the words;
+  `LiveMic` feeds it 10 ms pieces off a sink with voice processing on, the
+  Minimoji app's pipeline, on iPhone and Mac:
+
+  ```swift
+  @StateObject private var mic = LiveMic()
+  // ask first (AVAudioApplication.requestRecordPermission): start throws .permissionMissing, it never prompts
+  try mic.start()                                   // LiveMic.Options(voiceProcessing:visemes:lookAhead:pitch:)
+  MinimojiMetalHeadView(document: head, talking: mic.isOn, performance: mic.voice)
+  mic.onBuffer = { request.append($0) }             // a transcriber gets the tap's whole buffers (audio thread)
+  mic.stop()                                        // safe idle and after any failure
+  ```
+
+  `input` says whether voice processing or the raw fallback opened; on iOS
+  it takes the `AVAudioSession` while on and stops when a call takes it.
 - Events ride the same snapshot as counters, never flags: bump
   `blinkSequence` for a blink, `dropSequence` for the listening drop (a
   bigger nod and a burst of notes: a pluck, a beat drop). Each fires once
