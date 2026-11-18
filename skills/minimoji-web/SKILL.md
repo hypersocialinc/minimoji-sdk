@@ -33,6 +33,12 @@ npm install react@19 react-dom@19 three@0.160 @react-three/fiber@9
   client only: put `'use client'` on the file that mounts the stage.
 - WebGL: a stage needs a browser. Server-render the anchors and the poster
   (section 4), never the stage.
+- What it fetches by default: the engine is inside the package, so a head
+  draws with no network beyond what you point it at, but for two things from `https://www.minimoji.com` (allow
+  them in a strict CSP): a sculpted haircut or hat's mesh from `/sdk/parts/`
+  (`connect-src`; if it fails the head draws a hand-made fallback) and the
+  mood stickers' PNGs from `/emote-bursts/` (`img-src`, or serve your own,
+  section 5).
 
 ## 2. One head
 
@@ -805,7 +811,10 @@ export function Reacting({ avatar }: { avatar: AvatarInput }) {
   of a line. Nothing to wire: a line's mood cues reach `expression`, so
   `useLine` lines pop them at each cue. The PNGs load from
   `https://www.minimoji.com/emote-bursts/` (allow it in `img-src`), or
-  `<MinimojiStage burstBase="/your/copy/">`.
+  serve your own: the package ships them in `emote-bursts/`, so copy
+  `node_modules/@minimoji/react/emote-bursts/` into your static folder
+  (`public/emote-bursts/` in Next.js) and pass
+  `<MinimojiStage burstBase="/emote-bursts/">`.
 - **Face only**: `decorations={false}` (and `decorations: false` on the
   vanilla bundle's `mountHeadPerformance`) shows no stickers (it overrides
   `bursts`) and none of the rig's own effects: tears, sparkles, steam,
