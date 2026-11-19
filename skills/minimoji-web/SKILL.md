@@ -992,6 +992,23 @@ same-origin credentials (http(s) or a /path; pass bytes otherwise); account chec
 prepared file owns its geometry and materials; `prepared.dispose()` frees only
 the template.
 
+### A packed character's colours (recolour by slot)
+
+A character pack (`minimoji characters pack`) declares colour slots; each look's file says which
+parts wear each slot. `prepared.slots` is that map (`{ shell: ['body', …], trim: [] }`, or `null`
+for a file with none: its colours are fixed). Recolour live, no reload:
+
+```js
+const stage = mountBakedHeadPerformance(el, { bakedHead: prepared, colors: { skin: '#9b5de5' } });
+stage.setColors({ trim: '#ffcc00' });                     // instant
+stage.setBakedHead(nextLook, { colors: current });        // another look of the same character
+```
+
+`buildBakedHead(prepared, { colors })` and `setBakedHeadColors(head, colors)` do the same on a
+head you mount yourself. They throw on an unknown slot or a colour that is not `#rrggbb`; a slot
+that is empty on this look changes nothing. An editor for a character's looks and colours is the
+`minimoji-editor` skill.
+
 ### Recording a video frame by frame (no GPU needed)
 
 To export a head to video (an MP4 of a narrated deck, recorded in headless

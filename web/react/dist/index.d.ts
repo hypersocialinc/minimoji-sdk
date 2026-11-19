@@ -553,6 +553,9 @@ export interface PreparedBakedHead {
   readonly byteLength: number;
   readonly bounds: Readonly<Built['bounds']>;
   readonly faceNames: readonly string[];
+  /** A packed character's colour slots: slot → the parts wearing it in this file (an empty list: that slot is not on
+   *  this variant). null on a head with no slot map (another bake, or a pack from before it): its colours are fixed. */
+  readonly slots: Readonly<Record<string, readonly string[]>> | null;
   /** New geometry, materials and animation metadata; no state is shared with another instance. */
   createBuilt(): Built;
   /** Frees the template only; existing instances remain usable. Idempotent. */
@@ -570,7 +573,12 @@ export const loadBakedHead: typeof prepareBakedHead;
 export function buildBakedHead(prepared: PreparedBakedHead, opts?: {
   gaze?: boolean; drift?: boolean; performances?: boolean; emotes?: boolean; naturalTalk?: boolean;
   environment?: Texture; random?: () => number;
+  /** a packed character's colours by slot, `{ trim: '#7a3cff' }` (see `prepared.slots`); throws on an unknown slot */
+  colors?: Readonly<Record<string, string>>;
 }): Head;
+/** Recolour a head from `buildBakedHead` by colour slot, live (no reload). Throws on a head with no slot map, an
+ *  unknown slot or a colour that is not #rrggbb; a slot with no parts on this variant changes nothing. */
+export function setBakedHeadColors(head: Head, colors: Readonly<Record<string, string>>): void;
 
 export function randomAvatar(rng?: () => number, overrides?: AvatarInput): Avatar;
 export function normalize(a: AvatarInput): Avatar;

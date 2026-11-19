@@ -262,6 +262,22 @@ let cast = try await service.characters()   // ids, names, families, pick axes; 
   `{"character": …}`, `service.save(doc)` saves it, `CharacterSelection(document: doc)`
   reads it back, nil for a person); `colors:` overrides do nothing on one.
 
+### A packed character's colours (recolour by slot)
+
+A creator's packed character (`minimoji characters pack`) loads like any head:
+`GLB.decodeHead(data)` (check the file against its manifest `sha256` first). Its file names
+which parts wear each colour slot (`doc.meta.custom?.slots`; nil: its colours are fixed).
+Recolour live by slot:
+
+```swift
+let colors = try ColorOverrides(slots: ["skin": "#9b5de5", "light": "#ffcc00"], in: doc)
+MinimojiMetalHeadView(document: doc, colors: colors)
+```
+
+It throws `SlotColorError` on an unknown slot or a colour that is not `#rrggbb`; a slot empty on
+this look changes nothing; a glow part glows in its new colour. An editor for a character's looks
+and colours is the `minimoji-editor` skill (section 5 below is the official Mini avatar editor).
+
 ## 5. The editor
 
 ```swift

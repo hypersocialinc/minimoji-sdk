@@ -54,6 +54,9 @@ export interface HeadPerformanceOptions {
   poster?: HeadPoster | string | null;
   /** a screen face's (D.A.S.H.'s) CRT look, scanlines and glass following the mood: 0 off, 1 (the default), 2 loud. A head of skin ignores it */
   crt?: 0 | 1 | 2;
+  /** a packed character's colours by slot for the solo `bakedHead`, `{ trim: '#7a3cff' }` (see `prepared.slots`);
+   *  throws on an unknown slot or a head with no slot map */
+  colors?: Readonly<Record<string, string>> | null;
   /** RECORD FRAME BY FRAME (video export): a stepped clock from `createManualClock({ seed })`. The stage runs no loop of
    *  its own and reads no wall clock or pointer: nothing advances and nothing draws until `stage.step(dt)`, each step
    *  is one frame advanced by exactly `dt`, and the same seed and calls draw the same frames. `frame`/`idleFrame` only
@@ -107,7 +110,10 @@ export interface HeadPerformanceStage {
    *  the face held where a line jumped to (a seek, a stall), put back without its stickers */
   setMood(mood: string, id?: string, catchUp?: boolean): void;
   /** replace the stage's head(s) with one solo baked head (a tiled stage becomes solo) */
-  setBakedHead(prepared: PreparedBakedHead): void;
+  setBakedHead(prepared: PreparedBakedHead, options?: { colors?: Readonly<Record<string, string>> | null }): void;
+  /** recolour the solo baked head by colour slot, live (no reload); throws on an unknown slot, a colour that is not
+   *  #rrggbb or a head with no slot map. A slot with no parts on this variant changes nothing */
+  setColors(colors: Readonly<Record<string, string>>): void;
   /** put a live source on a head (`setPerformance(await liveMic())`): its mouth is the head's while it talks, and the
    *  stage draws its own frames while one is set. null takes it off; `id` picks a tile */
   setPerformance(source: LiveMicSession | { performance(t?: number): unknown } | ((t: number) => unknown) | null, id?: string): void;
@@ -146,6 +152,9 @@ export interface PreparedBakedHead {
   readonly byteLength: number;
   readonly bounds: Readonly<{ w: number; h: number; cy: number; minY: number; maxY: number }>;
   readonly faceNames: readonly string[];
+  /** a packed character's colour slots: slot → the parts wearing it in this file (an empty list: not on this
+   *  variant). null on a head with no slot map (another bake, or a pack from before it): its colours are fixed */
+  readonly slots: Readonly<Record<string, readonly string[]>> | null;
   /** frees the template; heads already mounted from it keep working. Idempotent */
   dispose(): void;
 }
