@@ -11,6 +11,7 @@ import { init } from "./init.js";
 import { avatars, status } from "./library.js";
 import { CliError, resolveBase } from "./service.js";
 import { skills } from "./skills.js";
+import { needsSetup, setup } from "./setup.js";
 import { characters } from "./characters.js";
 import { lines } from "./lines.js";
 import { serve } from "./mcp.js";
@@ -27,6 +28,9 @@ const KEY = { key: { type: "string" } };
 const SITE = { site: { type: "string" } };
 
 const COMMANDS = {
+  setup: { run: setup, options: { agent: { type: "string" }, yes: { type: "boolean", short: "y" }, ref: { type: "string" } },
+    usage: "minimoji setup [--agent claude|codex|both] [--yes] [--ref <git ref>]",
+    about: "Set up this project for your coding agent: choose Claude Code, Codex or both and install the full skill bundle. No sign-in needed." },
   login: { run: login, options: { label: { type: "string" }, force: { type: "boolean" }, "no-browser": { type: "boolean" } },
     usage: "minimoji login [--label <name>] [--force] [--no-browser]",
     about: "Sign this terminal in: approve the code in the browser; the session is saved to ~/.config/minimoji/credentials.json (0600)." },
@@ -100,14 +104,16 @@ function help() {
     "  --help        the command's usage",
     "",
     "Avatar commands save with the CLI's own secret key, minted on first use; --key or MINIMOJI_KEY uses another.",
-    "Start with: minimoji login, then minimoji init in your app's folder.",
+    "Start with: minimoji setup in your project's folder. It installs the skills your coding agent needs.",
+    "For account features: minimoji login, then minimoji init to configure your app's key.",
   ].join("\n");
 }
 
 export async function main(argv, ctx) {
   const wantsJSON = argv.includes("--json");
   try {
-    const [name, ...rest] = argv;
+    let [name, ...rest] = argv;
+    if (!name && await needsSetup(ctx)) name = "setup";
     if (!name || name === "--help" || name === "-h" || name === "help") { ctx.stdout(`${help()}\n`); return 0; }
     if (name === "--version" || name === "-v" || name === "version") { ctx.stdout(`${VERSION}\n`); return 0; }
     const command = COMMANDS[name];

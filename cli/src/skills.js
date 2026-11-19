@@ -157,11 +157,20 @@ async function install(ctx, dir, name, files, sha, { force = false } = {}) {
   const target = join(dir, name);
   const changed = await modifiedFiles(target, { ctx, name });
   if (changed.length && !force) throw new CliError(`${target} has changes you made (${changed.slice(0, 5).join(", ")}${changed.length > 5 ? ", …" : ""}); nothing was replaced. Move them aside, or pass --force to replace them`);
+  return writeSkill(dir, name, await fetchSkill(ctx, name, files, sha), sha);
+}
+
+async function fetchSkill(ctx, name, files, sha) {
   const fetched = [];
   for (const file of files) {
     const res = await get(ctx, `${raw(ctx)}/${SKILLS_REPO}/${sha}/skills/${name}/${file}`, "*/*");
     fetched.push([file, Buffer.from(await res.arrayBuffer())]);
   }
+  return fetched;
+}
+
+async function writeSkill(dir, name, fetched, sha) {
+  const target = join(dir, name);
   const skillMD = fetched.find(([f]) => f === "SKILL.md");
   await rm(target, { recursive: true, force: true });
   const written = {};
@@ -199,16 +208,44 @@ export async function installedSkills(ctx) {
 
 export async function addSkills(ctx, opts, names) {
   const agent = await detectAgent(ctx, opts);
+  const result = await addSkillsForAgents(ctx, opts, [agent], names);
+  return { agent, ref: result.ref, installed: result.installed.map(({ agent: _agent, ...skill }) => skill) };
+}
+
+/** Check every destination and download the whole bundle before writing either
+ * agent's copy. A conflict or failed download leaves all existing skills alone. */
+export async function addSkillsForAgents(ctx, opts, agents, names = []) {
+  if (!agents.length || agents.some((agent) => !Object.keys(AGENT_DIRS).includes(agent))) throw new CliError("--agent is claude, codex or both");
   const sha = await resolveRef(ctx, opts);
   const available = await availableSkills(ctx, sha);
-  const wanted = names.length ? names : [...available.keys()];
+  const wanted = [...new Set(names.length ? names : available.keys())];
+  if (!wanted.length) throw new CliError(`no skills available in ${SKILLS_REPO}; nothing was installed`);
   const missing = wanted.filter((n) => !available.has(n));
   if (missing.length) throw new CliError(`no skill ${missing.map((n) => `"${n}"`).join(", ")} in ${SKILLS_REPO}; it has ${[...available.keys()].join(", ") || "none"}`);
-  const dir = join(/* turbopackIgnore: true */ ctx.cwd, AGENT_DIRS[agent]);
+  const destinations = [...new Set(agents)].map((agent) => ({ agent, dir: join(/* turbopackIgnore: true */ ctx.cwd, AGENT_DIRS[agent]) }));
+  const checkDestinations = async () => {
+    for (const { dir } of destinations) {
+      for (const name of wanted) {
+        const target = join(/* turbopackIgnore: true */ dir, name);
+        await refuseForeign(target);
+        if (!opts.force) {
+          const changed = await modifiedFiles(target, { ctx, name });
+          if (changed.length) throw new CliError(`${target} has changes you made (${changed.slice(0, 5).join(", ")}); nothing was replaced. Move them aside, or use minimoji skills add --force to replace them`);
+        }
+      }
+    }
+  };
+  await checkDestinations();
+  const fetched = new Map();
+  for (const name of wanted) fetched.set(name, await fetchSkill(ctx, name, available.get(name), sha));
+  // Recheck after the network completes: edits made during download must
+  // block the whole bundle before any destination is written.
+  await checkDestinations();
   const installed = [];
-  for (const name of wanted) await refuseForeign(join(/* turbopackIgnore: true */ dir, name));
-  for (const name of wanted) installed.push(await install(ctx, dir, name, available.get(name), sha, { force: !!opts.force }));
-  return { agent, ref: sha, installed };
+  for (const { agent, dir } of destinations) {
+    for (const name of wanted) installed.push({ ...await writeSkill(dir, name, fetched.get(name), sha), agent });
+  }
+  return { agents: destinations.map(({ agent }) => agent), ref: sha, installed };
 }
 
 export async function skills(ctx, _base, opts, out, [sub, ...names]) {

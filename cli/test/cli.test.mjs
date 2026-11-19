@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { makeCtx, run } from "./helpers.mjs";
 
-const COMMANDS = ["login", "logout", "whoami", "keys", "init", "skills", "generate", "species", "render", "preview"];
+const COMMANDS = ["setup", "login", "logout", "whoami", "keys", "init", "skills", "generate", "species", "render", "preview"];
 const pkgDir = fileURLToPath(new URL("..", import.meta.url));
 
 test("every command has --help and takes --json", async () => {

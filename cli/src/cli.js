@@ -32,6 +32,7 @@ const code = await main(process.argv.slice(2), {
   home: homedir(),
   hostname: hostname().replace(/\.local$/, ""),
   stdin: process.stdin,
+  stderrIsTTY: !!process.stderr.isTTY,
   stdout: (s) => process.stdout.write(s),
   stderr: (s) => process.stderr.write(s),
   fetch: globalThis.fetch,

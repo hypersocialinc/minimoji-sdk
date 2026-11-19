@@ -34,20 +34,29 @@ skills/
 
 ## The CLI
 
+Install the CLI once, then run the wizard from your project's folder:
+
 ```sh
-npx minimoji login           # approve the code in the browser
-npx minimoji init            # in your app's folder: a publishable key, written where the app reads it
-npx minimoji skills list     # see available skills and which are installed here
-npx minimoji generate "red curls, round glasses" --open   # make a head and see it live
+npm install -g minimoji
+minimoji setup
 ```
 
-Node 20 or later, no dependencies. [cli/README.md](cli/README.md) has every
-command.
+Choose Claude Code, Codex or both, then confirm installation of the full skill
+bundle. No Minimoji account is needed. Start a new agent session and ask it to
+add a talking avatar to your app. The wizard installs project skills; your agent
+can help with SDK packages and account setup when needed.
+
+Node 20 or later, no dependencies. Prefer no global install? Run
+`npx minimoji setup`. For automation, use
+`minimoji setup --yes --agent claude|codex|both --json`.
+[cli/README.md](cli/README.md) has every command, including `minimoji login`,
+`minimoji init` for your app's key and `minimoji generate` to make an avatar.
 
 ## The skills
 
-Run these commands from your project's folder. Install just the skill you need;
-installing a skill needs no Minimoji login or API key.
+Skills are instructions, examples and supporting files that teach your coding
+agent to build with Minimoji. Setup installs the full public bundle so your agent
+can use the guides that fit your project. Individual installs are also available:
 
 | Skill | Use it for |
 | --- | --- |

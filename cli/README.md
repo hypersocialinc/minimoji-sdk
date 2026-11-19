@@ -15,12 +15,37 @@ avatars from the terminal. Node 20 or later, no dependencies.
 - See any avatar live: [minimoji.com/preview](https://www.minimoji.com/preview)
 - Source and skills: [hypersocialinc/minimoji-sdk](https://github.com/hypersocialinc/minimoji-sdk)
 
+## Get started
+
+Install the CLI once, then run the setup wizard from your project's folder:
+
 ```sh
-npx minimoji login           # approve the code in the browser
-npx minimoji init            # in your app's folder: a publishable key, written where the app reads it
-npx minimoji skills add      # teach your coding agent the SDK
-npx minimoji generate "red curls, round glasses" --open   # make a head and see it live
+npm install -g minimoji
+minimoji setup
 ```
+
+The wizard suggests an agent from your project, lets you choose **Claude Code,
+Codex or both**, and asks before installing the full Minimoji skill bundle.
+Skills are instructions and examples that teach your agent to create avatars,
+make them talk and build with Minimoji. No sign-in or API key is needed for setup.
+They go in this project's `.claude/skills/` or `.agents/skills/`, and setup
+refuses to overwrite your edits or unrelated skills.
+
+Start a new agent session in the project and ask: **“Add a talking Minimoji
+avatar to my app.”** Your agent can guide the SDK and account setup as needed.
+
+Typing `minimoji` with no command also opens the wizard in an interactive
+terminal when this project has no Minimoji skills. Use `minimoji setup` to run
+it again, or `npx minimoji setup` without a global install. CI, redirected input
+and `--json` never prompt; automation must choose an agent and confirm explicitly:
+
+```sh
+minimoji setup --yes --agent both --json
+```
+
+`--agent claude|codex|both` preselects the agent, and `--ref <git ref>` pins the
+skill source. `minimoji skills update` keeps installed skills current. Installing
+the npm package itself does not prompt or write skills into a project.
 
 ## Signing in
 
@@ -28,6 +53,12 @@ npx minimoji generate "red curls, round glasses" --open   # make a head and see 
 opens the browser when it can, and waits while you approve it. The session
 is saved to `~/.config/minimoji/credentials.json` (mode 0600). `--no-browser`
 only prints the link (for SSH, or an agent that hands the link to a person).
+
+```sh
+minimoji login           # approve the code in the browser
+minimoji init            # configure your app with a publishable key
+minimoji generate "red curls, round glasses" --open
+```
 
 | Command | What it does |
 | --- | --- |
