@@ -54,7 +54,37 @@ export interface HeadPerformanceOptions {
   poster?: HeadPoster | string | null;
   /** a screen face's (D.A.S.H.'s) CRT look, scanlines and glass following the mood: 0 off, 1 (the default), 2 loud. A head of skin ignores it */
   crt?: 0 | 1 | 2;
+  /** RECORD FRAME BY FRAME (video export): a stepped clock from `createManualClock({ seed })`. The stage runs no loop of
+   *  its own and reads no wall clock or pointer: nothing advances and nothing draws until `stage.step(dt)`, each step
+   *  is one frame advanced by exactly `dt`, and the same seed and calls draw the same frames. `frame`/`idleFrame` only
+   *  set what the next step draws. A `poster` stays until `stage.ready` resolves, then leaves at once (no fade, no
+   *  puff). Off by default */
+  clock?: ManualClock | null;
 }
+
+/** A STEPPED CLOCK for recording a head frame by frame. Mount the stage on it, `await stage.ready`, then `stage.step(1 / 30)`
+ *  once per video frame: every clock the head has moves by exactly that much and one frame is drawn, however long the
+ *  recorder takes between steps. A voiced performance on a stepped stage plays no sound: mux the audio yourself */
+export interface ManualClock {
+  readonly manual: true;
+  readonly seed: number;
+  /** seconds: the sum of every step */
+  now(): number;
+  readonly time: number;
+  readonly steps: number;
+  /** move every clock by `dt` seconds (finite, ≥ 0) and draw one frame on every stage on this clock; answers the time */
+  step(dt: number): number;
+  /** resolves once nothing held on this clock is still loading */
+  readonly ready: Promise<void>;
+  /** a seeded random source of its own for `salt` */
+  random(salt?: string): () => number;
+  /** run `fn` on every step; answers the unsubscribe */
+  onStep(fn: (dt: number, time: number) => void): () => void;
+  /** have `ready` wait for a load of yours too; answers the promise as given */
+  hold<T>(promise: Promise<T>): Promise<T>;
+}
+/** a stepped clock: `seed` deals the dice (blinks, glances, which emote plays) of every head on it (default 1) */
+export function createManualClock(options?: { seed?: number }): ManualClock;
 
 /** a poke's answer: a face held a moment and a short move on the head (no sound: play your own from `onPoke`) */
 export type Reaction = 'oof' | 'ah' | 'flinch' | 'giggle' | 'dizzy';
@@ -81,6 +111,15 @@ export interface HeadPerformanceStage {
   /** put a live source on a head (`setPerformance(await liveMic())`): its mouth is the head's while it talks, and the
    *  stage draws its own frames while one is set. null takes it off; `id` picks a tile */
   setPerformance(source: LiveMicSession | { performance(t?: number): unknown } | ((t: number) => unknown) | null, id?: string): void;
+  /** resolves (to the stage) once every lazy load a frame depends on is in: the sculpted parts (and the head rebuilt
+   *  with them), the sticker scripts (minimoji-heads-bursts.js) and their sprites. On a stepped stage the poster then leaves */
+  readonly ready: Promise<HeadPerformanceStage>;
+  /** the stepped clock the stage runs on, or null */
+  readonly clock: ManualClock | null;
+  /** a stepped stage: move its clock (and every stage on it) by `dt` seconds and draw one frame. Throws on a live stage */
+  step(dt: number): void;
+  /** the frame just drawn as ImageData (device px): the head's canvas with its stickers behind and in front */
+  capture(): ImageData;
   dispose(): void;
   [member: string]: any;
 }
@@ -126,7 +165,13 @@ export function mountBakedHeadPerformance(container: HTMLElement, options: Omit<
 
 /** a voiced performance: one owned media element per run; a selection is a `{ timeline, audio, duration }` or plain audio */
 export function createVoicedPerformance(options: {
-  createMedia: (url: string) => HTMLMediaElement;
+  /** the element a run plays on. Required on a live stage. On a stepped stage it is optional and sets the timebase:
+   *  given, the element's currentTime, paused and ended drive the line, as live (give a silent one for a recording,
+   *  whose currentTime is your recorder's clock); left out, the line runs on the stage's clock with no element */
+  createMedia?: (url: string) => HTMLMediaElement;
+  /** a stepped stage's timebase, when you want to say it: 'media' (needs createMedia) or 'clock'. Default: 'media'
+   *  when createMedia is given, else 'clock'. A live stage is always 'media' */
+  timebase?: 'media' | 'clock';
   loadTimeline: (url: string, signal: AbortSignal) => Promise<unknown>;
   stage: unknown;
   changed?: (state: unknown) => void;
@@ -136,7 +181,21 @@ export function createVoicedPerformance(options: {
   muted?: boolean;
   /** 0..1 on every element a run makes (and the live one); unset leaves the element as `createMedia` made it */
   volume?: number;
+  /** where plain audio with no words is transcribed */
+  transcribe?: { key: string; service: string } | null;
 }): {
+  /** on a stepped stage, timebase 'clock': start the line on the stage's clock, with no media and no sound; each
+   *  `stage.step(dt)` moves it by `dt`, and it ends (status `ended`) on the step that reaches its duration. Timebase
+   *  'media': as live (play() on your element; its currentTime is the line's time); the steps draw it */
+  play(): void;
+  /** the line's time now (seconds), on its timebase: drive your own captions or reveals from it */
+  readonly time: number;
+  /** is the line playing (not loading, paused, buffering, stopped or ended)? */
+  readonly playing: boolean;
+  /** which clock the line follows: 'media' (the element's currentTime) or 'clock' (a stepped stage's) */
+  readonly timebase: 'media' | 'clock';
+  pause(): void;
+  stop(): void;
   select(next: unknown): Promise<void>;
   prepare(next: unknown): Promise<SpeechLine>;
   /** mute or unmute the live element at once and every later run's (a muted head still talks: the clock is the element's) */
@@ -157,6 +216,8 @@ export function createLineSession(opts?: {
   onEnd?: (generation: number, reason: 'ended' | 'stopped' | 'failed', error?: Error) => void;
   clips?: ClipCache;
   audioContext?: () => AudioContext;
+  /** a stepped clock (createManualClock): the line on its time, no sound */
+  clock?: ManualClock | null;
 }): { say(line: unknown, opts?: object): number | null; prepare(clip: unknown): Promise<SpeechLine>; stop(): void; dispose(): void; [member: string]: any };
 
 /** why a live mic failed: `denied`, `no-device`, `busy` (another app has it), `unsupported` (an http:// page, an old
@@ -197,8 +258,8 @@ export const LIVE_MIC_CONSTRAINTS: Readonly<{ echoCancellation: true; noiseSuppr
 /** The head's own loader without React: its still (soft, breathing) in `container`, under the stage's canvas. */
 export interface HeadPoster {
   readonly element: HTMLElement;
-  /** the head drew: the still fades and leaves the page */
-  ready(): void;
+  /** the head drew: the still fades and leaves the page (`instant`: at once, no fade or puff, as a stepped stage does) */
+  ready(options?: { instant?: boolean }): void;
   /** the head will not draw: the still stays, sharp */
   error(): void;
   dispose(): void;

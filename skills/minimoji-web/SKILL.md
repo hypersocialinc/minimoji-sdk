@@ -992,6 +992,90 @@ same-origin credentials (http(s) or a /path; pass bytes otherwise); account chec
 prepared file owns its geometry and materials; `prepared.dispose()` frees only
 the template.
 
+### Recording a video frame by frame (no GPU needed)
+
+To export a head to video (an MP4 of a narrated deck, recorded in headless
+Chromium where WebGL runs on SwiftShader at a few fps), put the stage on a
+**stepped clock**. It then runs no loop of its own and reads no wall clock:
+nothing moves and nothing draws until you call `step(dt)`, each step moves
+every clock the head has (blinks, breath, emotes, stickers, cues, a line) by
+exactly `dt` seconds and draws one frame into the normal canvas, and the same
+seed and the same calls draw the same frames every run, however slow the
+recorder is between steps.
+
+```tsx
+'use client';
+import { useEffect, useMemo, useRef } from 'react';
+import { MinimojiStage, MinimojiHead, useLine, createManualClock, type SpeechLine } from '@minimoji/react';
+
+export function Recorder({ line, onFrame }: { line: SpeechLine; onFrame: (i: number) => Promise<void> }) {
+  const anchor = useRef<HTMLDivElement>(null);
+  const clock = useMemo(() => createManualClock({ seed: 7 }), []);   // the dice: same seed, same blinks
+  const talk = useLine({ clock });                                     // the line runs on the steps, with no sound
+  useEffect(() => {
+    let stop = false;
+    (async () => {
+      await clock.ready;          // the head built, its sculpted parts and the stickers loaded
+      talk.say(line);             // mux the line's audio into the video yourself, starting at this frame
+      for (let i = 0; i < 300 && !stop; i++) { clock.step(1 / 30); await onFrame(i); }
+    })();
+    return () => { stop = true; };
+  }, []);
+  return (
+    <>
+      <div ref={anchor} style={{ position: 'relative', width: 360, height: 360 }} />
+      <MinimojiStage clock={clock}>
+        <MinimojiHead avatar={{ seed: 4821 }} anchor={anchor} emotes={false}
+          expression={talk.expression ?? 'neutral'} performance={talk.performance} cue={talk.cue} />
+      </MinimojiStage>
+    </>
+  );
+}
+```
+
+The vanilla bundle (`/sdk/minimoji-heads.js`, what a recorder page uses):
+
+```js
+import { mountHeadPerformance, createVoicedPerformance, createManualClock } from './minimoji-heads.js';
+const stage = mountHeadPerformance(el, { avatar, clock: createManualClock({ seed: 7 }), poster });
+const voice = createVoicedPerformance({ stage, loadTimeline });   // no createMedia: the line runs on the stage's clock
+await voice.select({ timeline: '/lines/hey.timeline.json', audio: '/lines/hey.mp3' });
+await stage.ready;            // parts, the sticker file (minimoji-heads-bursts.js) and sprites; the poster leaves
+voice.play();                 // no sound: the line starts on the stage's clock, here
+for (let i = 0; i < 300; i++) { stage.step(1 / 30); await recordFrame(stage.capture()); }
+```
+
+- **One timebase with your own captions**: give `createMedia` a silent
+  element whose `currentTime` is your recorder's clock, and the line follows
+  that element (`voice.timebase === 'media'`): its `currentTime`, `paused`
+  and `ended` are the truth, exactly as live, and the steps draw it. Without
+  `createMedia` the line runs on the stage's clock (`'clock'`), and
+  `voice.time` / `voice.playing` are its time for your captions. Pause, stop
+  and replay work in both, per performance, with several stages on one clock.
+- `step(dt)` draws synchronously, inside the call, and reads no
+  `performance.now`, `Date.now`, timer or animation frame: a recorder that
+  patches those to its own tick can step and screenshot.
+
+- **Audio**: a line on a stepped clock never plays (no element is made for
+  a URL, a host's element is never played). Mux the clip into the video
+  yourself, offset to the frame you started the line on.
+- **Wait for `ready`** (`clock.ready`, or `stage.ready` on the vanilla stage)
+  before the first step you keep: lazy loads (a sculpted cut, the sticker
+  file and its PNGs, a clip still building) land on the wall clock, and a
+  frame stepped before them would draw without them.
+- **The poster** stays until `stage.ready` resolves, then leaves at once
+  (no fade, no puff). A frame stepped before `ready` records it under the
+  head: only do that if you want it.
+- `stage.capture()` answers the frame just drawn as `ImageData`, stickers
+  included, with the stage's transparency (flatten it on your background).
+- **React: yield between steps** (await your frame capture, or
+  `await new Promise(r => setTimeout(r))`). A line's face and cues reach the
+  head as props, and React commits them between tasks: steps run back to back
+  in one task would skip them. The vanilla stage needs no yield.
+- `frame`/`idleFrame` on a stepped vanilla stage only set what the next step
+  draws; a stepped stage follows no pointer, and its heads open on
+  themselves (no landing). A live stage is unchanged: leave `clock` off.
+
 ## 9. Keys
 
 Drawing a head needs no key. A key is for the service's HTTP API

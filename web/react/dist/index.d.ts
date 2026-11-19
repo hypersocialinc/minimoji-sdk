@@ -284,11 +284,43 @@ export interface MinimojiStageProps {
    *  by default. For a strict CSP, serve your own copy of the package's `emote-bursts/` folder
    *  (`node_modules/@minimoji/react/emote-bursts/`) and point this at it, e.g. `"/emote-bursts/"` */
   burstBase?: string;
+  /** RECORD FRAME BY FRAME (video export): a stepped clock from `createManualClock({ seed })`. The stage then runs no
+   *  loop of its own and reads no wall clock or pointer: nothing advances and nothing draws until `clock.step(dt)`, each
+   *  step is one frame advanced by exactly `dt`, heads open on themselves (no landing), and the same seed and the same
+   *  calls draw the same frames. `await clock.ready` before the first step: it waits for the heads to build, their
+   *  sculpted parts and the stickers. Yield between steps (await your frame capture): a line's face and cues reach
+   *  the head as props, committed between tasks. Fixed for the life of the stage; off by default */
+  clock?: ManualClock | null;
   style?: CSSProperties;
   className?: string;
   children?: ReactNode;
 }
 export function MinimojiStage(props: MinimojiStageProps): ReactNode;
+
+/** A STEPPED CLOCK for recording a head frame by frame (`createManualClock`). Give the same one to the stage and to
+ *  `useLine({ clock })` (a vanilla stage: `mountHeadPerformance(el, { clock })`), then `await clock.ready` and call
+ *  `step(1 / 30)` once per video frame: each step moves every clock the heads have by exactly that much and draws one
+ *  frame, however long you take between steps. A line on it plays no sound: mux the audio yourself, from the line's start */
+export interface ManualClock {
+  readonly manual: true;
+  readonly seed: number;
+  /** seconds: the sum of every step */
+  now(): number;
+  readonly time: number;
+  readonly steps: number;
+  /** move every clock by `dt` seconds (finite, ≥ 0) and draw one frame on every stage on this clock; answers the time */
+  step(dt: number): number;
+  /** resolves once nothing the next frame depends on is still loading */
+  readonly ready: Promise<void>;
+  /** a seeded random source of its own for `salt` */
+  random(salt?: string): () => number;
+  /** run `fn` on every step; answers the unsubscribe */
+  onStep(fn: (dt: number, time: number) => void): () => void;
+  /** have `ready` wait for a load of yours too; answers the promise as given */
+  hold<T>(promise: Promise<T>): Promise<T>;
+}
+/** a stepped clock: `seed` deals the dice (blinks, glances, which emote plays) of every head on it (default 1) */
+export function createManualClock(options?: { seed?: number }): ManualClock;
 
 /** a poke's answer: a face held a moment and a short move on the head (no sound: play your own from `onPoke`) */
 export type Reaction = 'oof' | 'ah' | 'flinch' | 'giggle' | 'dizzy';
@@ -704,6 +736,9 @@ export function useLine(opts?: {
   /** SAY A LINE FROM TEXT: your publishable key and the service origin (plus `elevenLabsKey` to speak on your own
    *  ElevenLabs account). A clip `{ text, voice }` is spoken by Minimoji's POST /lines/say and plays its answer */
   synthesize?: ClipSynthesizer | null;
+  /** the stage's stepped clock (`<MinimojiStage clock>`): the line runs on its time and plays no sound; a clip still
+   *  building is held on it (`clock.ready`). Read at the first render */
+  clock?: ManualClock | null;
 }): LinePlayerApi;
 /** the hook's logic without React */
 export function createLineSession(opts?: {
@@ -720,6 +755,8 @@ export function createLineSession(opts?: {
   transcribe?: ClipTranscriber | null | (() => ClipTranscriber | null);
   /** where a text clip is spoken (useLine's `synthesize`), or a function read at each say */
   synthesize?: ClipSynthesizer | null | (() => ClipSynthesizer | null);
+  /** a stepped clock (createManualClock): the line on its time, no sound */
+  clock?: ManualClock | null;
 }): { say: LinePlayerApi['say']; prepare: LinePlayerApi['prepare']; stop(): void; tick(): unknown; performance: PerformanceInput; readonly state: LineState; dispose(): void };
 
 export interface TextMouthApi {
@@ -747,6 +784,8 @@ export function useTextMouth(opts?: {
   /** where the eyes go while it speaks, in -1..1 (+ x to the head's right, + y up). The head does not read its own
    *  `look` prop while a performance is set, so this keeps the host's gaze; null (default): the head's own */
   look?: { x: number; y: number } | null;
+  /** the stage's stepped clock (`<MinimojiStage clock>`): the reply is paced on its steps. Read at the first render */
+  clock?: ManualClock | null;
 }): TextMouthApi;
 /** the pacer itself, on your own frame step: `append`, `finish`, `cancel`, `sample(dt)` (a mouth `{ open, width, round, level }`, or null once closed).
  *  `lag` (seconds, default 1.5) is the most it may trail the newest text; a non-finite or non-positive one throws a RangeError */
@@ -765,6 +804,8 @@ export function createTextMouthSession(opts?: {
   lag?: number;
   look?: { x: number; y: number } | null;
   now?: () => number;
+  /** a stepped clock (createManualClock): paced on its steps */
+  clock?: ManualClock | null;
 }): { append(text: string): void; finish(): void; cancel(): void; setLag(lag: number | undefined): void; setLook(look: { x: number; y: number } | null): void; tick(): void; performance: PerformanceInput; spoken(): number; readonly speaking: boolean };
 
 /** why a live mic failed: `denied` (the person or the site said no), `no-device`, `busy` (another app has it),
