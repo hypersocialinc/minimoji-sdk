@@ -378,6 +378,12 @@ export function DashSaysHey() {
   `setVolume(v)` hold a sound-off narrator across stop, replay and the next
   clip (every run makes a fresh element); the head still talks on a muted
   element. Unset, the element stays as your `createMedia` made it.
+  The mood stickers' scripts load after the first paint from
+  `minimoji-heads-bursts.js` beside the bundle (vendor both files). Hint the
+  bundle early with `<link rel="modulepreload" href=".../sdk/minimoji-heads.js">`;
+  a head built from its JSON draws sooner than a baked .glb (several MB). For a
+  baked head, `mountHeadPoster(el, { src: <the still> })` before
+  `prepareBakedHead`, then `mountHeadPerformance(el, { bakedHead, poster })`.
 - **`emotes={false}` on a talking head**, for the whole line: the line's strong mood
   cues emote through `cue`, quiet ones (k under 0.35) only change
   `expression`, gestures play through `cue`. `expression` is null between

@@ -15,6 +15,7 @@
   "main": "./minimoji-heads.js",
   "files": [
     "minimoji-heads.js",
+    "minimoji-heads-bursts.js",
     "minimoji-heads.d.ts",
     "engine",
     "emote-bursts",

@@ -49,6 +49,9 @@ export interface HeadPerformanceOptions {
    *  a screen face's effects); expressions, blush, lip sync (sound arcs and lines too) and head motion are untouched. Default true. Overrides
    *  `bursts`; applies to recipe heads, baked heads and every tile in this stage */
   decorations?: boolean;
+  /** the head's still until it draws: a `mountHeadPoster` handle (mount it before fetching a bake) or the still's src.
+   *  It gives way on the first frame; it stays, sharp, if mounting throws. */
+  poster?: HeadPoster | string | null;
   /** a screen face's (D.A.S.H.'s) CRT look, scanlines and glass following the mood: 0 off, 1 (the default), 2 loud. A head of skin ignores it */
   crt?: 0 | 1 | 2;
 }
@@ -190,3 +193,18 @@ export function liveMic(opts?: LiveMicOptions): Promise<LiveMicSession>;
 /** the session, not started */
 export function createLiveMicSession(opts?: LiveMicOptions): LiveMicSession;
 export const LIVE_MIC_CONSTRAINTS: Readonly<{ echoCancellation: true; noiseSuppression: true; autoGainControl: true }>;
+
+/** The head's own loader without React: its still (soft, breathing) in `container`, under the stage's canvas. */
+export interface HeadPoster {
+  readonly element: HTMLElement;
+  /** the head drew: the still fades and leaves the page */
+  ready(): void;
+  /** the head will not draw: the still stays, sharp */
+  error(): void;
+  dispose(): void;
+}
+/** Show a head's still (GET /avatars/<key>.png?size=256) at once, before a bake is fetched; pass the handle to
+ *  mountHeadPerformance's `poster`. Sets `data-minimoji` on the container (loading → ready or error). */
+export function mountHeadPoster(container: HTMLElement, options: { src: string; puff?: string | null }): HeadPoster;
+/** the loader's style sheet (mountHeadPoster adds it to the page once) */
+export const POSTER_CSS: string;
