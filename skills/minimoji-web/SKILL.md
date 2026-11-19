@@ -935,7 +935,9 @@ export function Friend({ avatar, online, typing, music }: { avatar: AvatarInput;
   fires the bigger nod and a burst of notes.
 - `setPresence`: `'online'`, `'asleep'` (eyes shut, slow breath; `z: true`
   lies it down with Zs), `'party'` (a bounce on the beat). Leaving asleep
-  plays the wake-up.
+  plays the wake-up. `{ state: 'asleep', z: true, roll: ASLEEP_GENTLE_ROLL }`
+  (exported, 16° in radians) stops the head at a gentle roll instead, the Zs
+  upright and the snore kept; the matching still is `.png?face=asleep` (no Zs).
 - `think(true)`: the typing state, a thinking face with a looping tilt;
   any speech takes the mouth at once.
 - `onReady` hands you the `Head` (and again after the avatar changes);

@@ -178,9 +178,13 @@ export type GlossFace =
   | 'worried' | 'scared' | 'dead' | 'smug' | 'joy' | 'sleeping' | 'crying' | 'thinking';
 
 /** a head's presence: 'online' (the idle), 'asleep' (offline: eyes and mouth shut, a slow breath, a partway
- *  droop; `z` lies it down with the Zs, which only a full-eye, non-lite build has) or 'party' (a bounce on the beat) */
+ *  droop; `z` lies it down with the Zs, which only a full-eye, non-lite build has; `roll` (radians, 0..0.95)
+ *  is where the head stops instead, Zs or not, the Zs upright at it — `ASLEEP_GENTLE_ROLL` is the gentle 16°)
+ *  or 'party' (a bounce on the beat) */
 export type PresenceState = 'online' | 'asleep' | 'party';
-export type Presence = PresenceState | { state: PresenceState; z?: boolean; tempo?: number };
+/** the gentle asleep roll, 16° in radians: `{ state: 'asleep', z: true, roll: ASLEEP_GENTLE_ROLL }` */
+export const ASLEEP_GENTLE_ROLL: number;
+export type Presence = PresenceState | { state: PresenceState; z?: boolean; roll?: number; tempo?: number };
 
 export interface HeadOffsets { x: number; y: number; yaw: number; pitch: number; rot: number }
 export interface FaceApi {
@@ -223,7 +227,7 @@ export interface FaceApi {
   thinking(): boolean;
   /** leaving 'asleep' for anything (thinking, talking, online, party) plays the built-in wake-up */
   setPresence(p: Presence | null): void;
-  presence(): { state: PresenceState; z?: boolean; tempo?: number };
+  presence(): { state: PresenceState; z?: boolean; roll?: number; tempo?: number };
   /** 1 as authored, up to 2: exaggerates the thinking face's subtle channels for a small head */
   setEmphasis(k: number): void;
   /** blink now; one already under way absorbs it */
