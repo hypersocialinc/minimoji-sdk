@@ -132,25 +132,12 @@ import MinimojiService
 enum Service {
   static let loggedAvatar: AvatarService? = AvatarService(base: URL(string: "https://<deployment>.convex.site")!, key: "mk_pub_…")
   private static let baker = LocalBaker()
-  static let deviceAvatar: Result<AvatarService?, Error> = Result {
-    guard var service = loggedAvatar else { return nil }
-    service.localBuilder = try baker.builder()
-    return service
-  }
 
   /// the service to hand the editor: with the device builder when the service
   /// bakes the same version (or has not answered in 3 s), else the server path
   static func editorService() async -> AvatarService? {
     guard let remote = loggedAvatar else { return nil }
-    let matches: Bool? = await withTaskGroup(of: Bool?.self) { group in
-      group.addTask { (try? await remote.capabilities()).map { $0.bakeVersion == LocalBaker.bakeVersion } }
-      group.addTask { try? await Task.sleep(for: .seconds(3)); return nil }
-      let first = await group.next() ?? nil
-      group.cancelAll()
-      return first
-    }
-    if matches == false { return remote }
-    return (try? deviceAvatar.get()) ?? remote
+    return await baker.attachIf(capabilities: remote)
   }
 }
 
@@ -166,15 +153,19 @@ Rules:
   == LocalBaker.bakeVersion`); a mismatch means the device would preview
   heads the service bakes differently. **The 3 s rule**: if
   `capabilities()` has not answered within 3 s (or failed), attach anyway.
-  `editorService()` runs both; keep it.
-- `builder()` throws on a stale bundle; `editorService()` then answers the
+  `attachIf(capabilities:)` runs both; do not reimplement them.
+- `builder()` throws on a stale bundle; `attachIf` then answers the
   service without a builder (the server path).
 - Keep one `LocalBaker` for the app's lifetime (its engine load is about
   half a second, done in the background on attach).
 - Still on the server with a builder attached: saving, a friend's head by
   key, CDN URLs, the `.png` renders.
-- **No server fallback yet**: a failed device build is shown by the editor
-  with a retry, not retried on the server.
+- **A failed or slow device build is answered by the server**: a throw or
+  more than `timeout` (10 s) retries the tap on the server path; three
+  failures in a row stop the device until the editor reopens
+  (`service.resetBreaker()`). Warm-ups never go to the server. Tune or turn
+  it off on the builder (`attachIf(capabilities:configure:)`, `fallback:
+  .none` for the old throw); `onLocalFailure` hears each failure.
 
 ## 4. Show a head
 
@@ -1014,10 +1005,12 @@ choose their own play control. These clips are public URL media.
   new face; the editor sends a photo alone. Calling
   `service.generate(photo:prompt:current:)` with a document by hand takes
   the slow edit ladder.
-- **Attach the engine only on a matching bake version**, and attach anyway
-  if capabilities is silent for 3 s (section 3).
-- **No server fallback for device builds yet**: the editor shows the error
-  and a retry.
+- **Attach the engine with `baker.attachIf(capabilities: service)`**: it
+  attaches on a matching bake version, or if capabilities is silent for 3
+  s, and not on a mismatch (section 3).
+- **Do not wrap device builds in your own timeout or fallback**: the Kit
+  times out (10 s), answers from the server, and breaks after 3 failures;
+  `onLocalFailure` is the place to log.
 - Secret keys stay on your backend; the app holds only `mk_pub_…`.
 - Use the `.convex.site` origin, not `.convex.cloud`.
 - Service errors are `AvatarService.Fail` (transport errors such as
