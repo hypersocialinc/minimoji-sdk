@@ -384,6 +384,12 @@ export function DashSaysHey() {
   a head built from its JSON draws sooner than a baked .glb (several MB). For a
   baked head, `mountHeadPoster(el, { src: <the still> })` before
   `prepareBakedHead`, then `mountHeadPerformance(el, { bakedHead, poster })`.
+  When you call `prepareBakedHead` yourself, the mount is synchronous and
+  only happens once the GLB is in, so the poster must go up first: call
+  `const poster = mountHeadPoster(el, { src })`, then
+  `await prepareBakedHead(...)`, then pass that same handle as
+  `mountHeadPerformance(el, { bakedHead, poster })`. The still shows during
+  the download and hands off to the live head.
 - **`emotes={false}` on a talking head**, for the whole line: the line's strong mood
   cues emote through `cue`, quiet ones (k under 0.35) only change
   `expression`, gestures play through `cue`. `expression` is null between
