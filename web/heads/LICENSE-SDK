@@ -1,0 +1,41 @@
+Minimoji SDK License
+
+Copyright (c) 2026 Hypersocial Inc. All rights reserved.
+
+This licence covers the Minimoji Swift package (Package.swift and Sources/)
+and the npm packages @minimoji/react and @minimoji/heads (together, "the
+SDK"). The CLI, the agent skills and the documentation in this repository
+are MIT-licensed instead (LICENSE).
+
+1. Use. You may use the SDK to build applications and websites, and ship,
+   sell or charge for those applications, including the SDK inside them.
+
+2. Redistribution. You may redistribute the SDK only as part of such an
+   application or website, not on its own or as part of another SDK,
+   library or developer tool.
+
+3. No extraction. You may not reverse engineer, decompile, de-minify or
+   otherwise attempt to recover source code from the SDK, or extract the
+   engine bundles it contains for use outside the SDK, except to the extent
+   applicable law expressly permits it despite this restriction.
+
+4. No competing products. You may not use the SDK, or anything learned from
+   it, to build an avatar engine, avatar SDK or avatar service that competes
+   with Minimoji.
+
+5. The service. Avatars, characters and other content come from the Minimoji
+   service under its own terms, through keys issued to you. This licence
+   grants no right to the service.
+
+6. Third-party software. The SDK includes third-party software under its own
+   licences, listed in THIRD_PARTY_NOTICES.md. Those licences govern those
+   parts.
+
+7. No warranty. THE SDK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL HYPERSOCIAL INC. BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY ARISING FROM, OUT OF OR IN CONNECTION WITH THE SDK OR ITS USE.
+
+8. Termination. This licence ends automatically if you breach it. On
+   termination you must stop distributing the SDK.

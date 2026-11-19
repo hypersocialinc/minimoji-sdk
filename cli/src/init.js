@@ -153,7 +153,7 @@ function nextSteps(project, target) {
     return [
       `Read the key in the app as process.env.${target.vars.key}${project.framework === "vite" ? ` (import.meta.env.${target.vars.key} in Vite)` : ""} and the service as ${target.vars.service}.`,
       ...(project.framework === "react" ? ["Unprefixed variables are not shown to a browser bundle: rename them for your bundler (REACT_APP_…, EXPO_PUBLIC_…) if it needs a prefix."] : []),
-      "@minimoji/react is not on npm yet: ask Minimoji for access before adding it.",
+      "Add the React package: npm install @minimoji/react react@19 react-dom@19 three@0.160 @react-three/fiber@9",
       "Saving avatars (POST /avatars) needs a secret key on your server: minimoji keys create --kind secret.",
       "Teach your coding agent the React package: minimoji skills add minimoji-web.",
     ];

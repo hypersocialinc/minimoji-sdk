@@ -22,12 +22,13 @@ exactly as section 4 shows.
 
 ## 1. Install
 
-`@minimoji/react` is **not on npm yet**: ask Minimoji for access. In the
-Minimoji monorepo it is `"@minimoji/react": "workspace:*"`. Its peers:
+`@minimoji/react` is on npm, with its peers:
 
 ```sh
-npm install react@19 react-dom@19 three@0.160 @react-three/fiber@9
+npm install @minimoji/react react@19 react-dom@19 three@0.160 @react-three/fiber@9
 ```
+
+In the Minimoji monorepo it is `"@minimoji/react": "workspace:*"`.
 
 - It is plain ESM with types, no build step. In Next.js it renders on the
   client only: put `'use client'` on the file that mounts the stage.

@@ -1,0 +1,32 @@
+{
+  "name": "@minimoji/heads",
+  "version": "18.4.0",
+  "description": "Mini avatar heads for any web page, no React or bundler needed: one ESM file with three.js inside.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./minimoji-heads.d.ts",
+      "default": "./minimoji-heads.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./minimoji-heads.d.ts",
+  "main": "./minimoji-heads.js",
+  "files": [
+    "minimoji-heads.js",
+    "minimoji-heads.d.ts",
+    "engine",
+    "emote-bursts",
+    "parts",
+    "LICENSE-SDK",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "license": "SEE LICENSE IN LICENSE-SDK",
+  "homepage": "https://minimoji.com/developers",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hypersocialinc/minimoji-sdk.git",
+    "directory": "web/heads"
+  }
+}

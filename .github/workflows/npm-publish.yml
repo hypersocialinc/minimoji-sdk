@@ -1,22 +1,28 @@
-# Publishes the `minimoji` CLI (cli/) to npm with trusted publishing and
-# provenance: OIDC, no stored token, no 2FA prompt, and the npm page links
-# the build to this public repository. A publish is a version bump in
-# cli/package.json landing on main; a version already on npm is skipped.
+# Publishes the `minimoji` CLI (cli/) and the web SDK packages
+# (@minimoji/react in web/react, @minimoji/heads in web/heads) to npm with
+# trusted publishing and provenance: OIDC, no stored token, no 2FA prompt, and
+# the npm page links the build to this public repository. A publish is a
+# version bump in a package.json landing on main; a version already on npm is
+# skipped.
 #
 # This repository is exported from Minimoji's private repo (see
 # CONTRIBUTING.md); edit this file there, at sdk/public/.github/workflows/.
 #
-# Before the first run here: npmjs.com → the package → Settings → Trusted
-# Publisher → GitHub Actions, organization hypersocialinc, repository
-# minimoji-sdk, workflow npm-publish.yml, no environment. Until then the
-# publish step fails and nothing ships.
-name: Publish CLI
+# Each package needs a trusted publisher on npmjs.com (the package → Settings
+# → Trusted Publisher → GitHub Actions: organization hypersocialinc,
+# repository minimoji-sdk, workflow npm-publish.yml, no environment), or
+# `npm trust github <package> --repo hypersocialinc/minimoji-sdk --file
+# npm-publish.yml`. Without one, that package's publish fails and it ships
+# nothing.
+name: Publish to npm
 
 on:
   push:
     branches: [main]
     paths:
       - cli/package.json
+      - web/react/package.json
+      - web/heads/package.json
   workflow_dispatch:
 
 permissions:
@@ -43,15 +49,17 @@ jobs:
       - run: npm install -g npm@latest
       - run: node --test
         working-directory: cli
-      - name: Publish when this version is not on npm yet
-        working-directory: cli
+      - name: Publish each package whose version is not on npm yet
         run: |
           set -euo pipefail
-          name=$(node -p "require('./package.json').name")
-          version=$(node -p "require('./package.json').version")
-          if npm view "$name@$version" version >/dev/null 2>&1; then
-            echo "$name@$version is already on npm, skipping"
-          else
-            echo "publishing $name@$version"
-            npm publish --access public --provenance
-          fi
+          for dir in cli web/react web/heads; do
+            [ -f "$dir/package.json" ] || continue
+            name=$(node -p "require('./$dir/package.json').name")
+            version=$(node -p "require('./$dir/package.json').version")
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "$name@$version is already on npm, skipping"
+            else
+              echo "publishing $name@$version"
+              (cd "$dir" && npm publish --access public --provenance)
+            fi
+          done

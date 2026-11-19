@@ -1,0 +1,52 @@
+{
+  "name": "@minimoji/react",
+  "version": "18.4.0",
+  "description": "Mini avatar heads for React: one <MinimojiStage> per page, <MinimojiHead> anchored anywhere in it, talking lines. The engine ships bundled and minified.",
+  "type": "module",
+  "sideEffects": [
+    "./dist/bursts.js"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./characters": {
+      "types": "./dist/characters.d.ts",
+      "default": "./dist/characters.js"
+    },
+    "./line": {
+      "types": "./dist/line.d.ts",
+      "default": "./dist/line.js"
+    },
+    "./clip": {
+      "types": "./dist/clip.d.ts",
+      "default": "./dist/clip.js"
+    },
+    "./bursts": {
+      "types": "./dist/bursts.d.ts",
+      "default": "./dist/bursts.js"
+    },
+    "./emote-bursts/*": "./emote-bursts/*",
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "emote-bursts",
+    "LICENSE-SDK",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "license": "SEE LICENSE IN LICENSE-SDK",
+  "homepage": "https://minimoji.com/developers",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hypersocialinc/minimoji-sdk.git",
+    "directory": "web/react"
+  },
+  "peerDependencies": {
+    "react": "^19",
+    "three": "^0.160.0",
+    "@react-three/fiber": "^9"
+  }
+}

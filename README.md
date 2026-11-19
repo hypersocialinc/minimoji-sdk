@@ -16,6 +16,9 @@ skills that teach a coding agent the SDK. MIT licensed.
 
 ```text
 cli/                      the minimoji CLI, published to npm as `minimoji`
+web/
+  react/                  @minimoji/react on npm: heads in a React app
+  heads/                  @minimoji/heads on npm: heads on any page, no React or bundler
 skills/
   minimoji-swift/
     SKILL.md              the MinimojiKit skill for Swift apps
@@ -80,7 +83,7 @@ npx skills add hypersocialinc/minimoji-sdk --skill minimoji-presenter
 ```
 
 Skills teach your agent; they do not install SDK packages or create API keys.
-The skills are public. MinimojiKit and the React package are available by request;
+The skills and the web packages are public. MinimojiKit is available by request;
 the presenter skill includes a vanilla web starter.
 
 The Swift skill integrates [MinimojiKit](https://www.minimoji.com/developers),
@@ -97,14 +100,23 @@ and
 The web skill integrates `@minimoji/react`: live heads and characters
 (D.A.S.H., the aliens, the animals) on a web page, the head's loader,
 lip-sync and emotes from a recorded line or audio, moods, gestures,
-listening and presence. The package is not on npm yet: ask Minimoji for
-access.
+listening and presence. Install it with its peers:
+
+```sh
+npm install @minimoji/react react@19 react-dom@19 three@0.160 @react-three/fiber@9
+```
+
+On a page with no React or bundler, `npm install @minimoji/heads` (or load
+`minimoji-heads.js` from a CDN at a fixed version) gives the same heads from
+one script.
 
 ## Licence
 
-MIT: see [LICENSE](LICENSE). The API (with a key), the CLI and these
-skills are open to anyone; the Swift package and `@minimoji/react` are for partners,
-by request, for now.
+The CLI and these skills are MIT: see [LICENSE](LICENSE). The web packages
+under `web/` (`@minimoji/react`, `@minimoji/heads`) are under the Minimoji SDK
+License (`LICENSE-SDK` in each). The API (with a key), the CLI, the skills and
+the web packages are open to anyone; the Swift package is for partners, by
+request, for now.
 
 ## Where this comes from
 
