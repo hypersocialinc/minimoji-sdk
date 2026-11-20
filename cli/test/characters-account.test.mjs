@@ -184,7 +184,7 @@ test("export runs Hyperdecks' own CLI with an argv array, always env + account +
     const calls = [];
     let reply = null;
     const execFile = (bin, args, opts, cb) => {
-      if (args[0] === "--version") return setImmediate(() => cb(null, `${globalThis.__hdVersion ?? "0.9.18"}\n`, ""));
+      if (args[0] === "--version") return setImmediate(() => cb(null, `${globalThis.__hdVersion ?? "0.9.19"}\n`, ""));
       const metadata = JSON.parse(require_(args[args.indexOf("--metadata") + 1]));
       calls.push({ bin, args, metadata, shell: opts.shell, glbExists: existsSync(args[2]) });
       const answer = reply(metadata);
@@ -192,11 +192,11 @@ test("export runs Hyperdecks' own CLI with an argv array, always env + account +
     };
     const ctx = { ...(await makeCtx({ env: { MINIMOJI_API: svc.url, HYPERDECKS_BIN: "/opt/hd/bin/hyperdecks" } })), execFile };
     await signIn(ctx, svc.url);
-    // a head with a mouth (CLI 0.9.18 is enough); masked heads and bake 19 need 0.9.19, see below
+    // a head with a mouth: bake 19 (every head since D.A.S.H.'s agent screens) needs CLI 0.9.19, see below
     const { pack } = await packed(ctx, "relay", "human");
     const saved = await run(ctx, ["characters", "save", pack, "--json"]);
     const sha256 = saved.json.revision.variants[0].sha256;
-    const ok = (m) => ({ ok: true, owner: { id: "hd_owner_1", email: "me@example.com" }, avatarId: "av_123", packId: "pkmine0123456789ab", sha256: m.sha256, bakeVersion: 18, stockVoice: "stock:warm-guide", created: true, reused: false, visibility: "private", defaultChanged: false, requirePrivate: true });
+    const ok = (m) => ({ ok: true, owner: { id: "hd_owner_1", email: "me@example.com" }, avatarId: "av_123", packId: "pkmine0123456789ab", sha256: m.sha256, bakeVersion: 19, stockVoice: "stock:warm-guide", created: true, reused: false, visibility: "private", defaultChanged: false, requirePrivate: true });
     reply = ok;
     const args = ["characters", "export", "local/relay", "--to", "hyperdecks", "--expect-account", "hd_owner_1", "--pack", "pkmine0123456789ab", "--stock-voice", "stock:warm-guide", "--json"];
     const r = await run(ctx, args);
@@ -242,13 +242,13 @@ test("export runs Hyperdecks' own CLI with an argv array, always env + account +
     reply = () => ({ ok: false, error: "the server did not acknowledge requirePrivate", code: "private_not_enforced", avatarId: "av_unsure" });
     const unack = await run(ctx, args);
     assert.deepEqual([unack.code, unack.json.ok, unack.json.uploaded, unack.json.avatarId, unack.json.receipt], [1, false, "maybe", "av_unsure", undefined]);
-    // the RELEASED 0.9.18 CLI fails closed itself (private_not_enforced unless the server confirms), and its
+    // the RELEASED CLI (0.9.18 on) fails closed itself (private_not_enforced unless the server confirms), and its
     // success answer does not repeat the flag: accepted, with the CLI version on the receipt
     globalThis.__hdExit = 0;
     reply = (m) => ({ ...ok(m), requirePrivate: undefined });
     const released = await run(ctx, args);
     assert.equal(released.code, 0, released.stdout);
-    assert.equal(released.json.receipt.hyperdecksCli, "0.9.18");
+    assert.equal(released.json.receipt.hyperdecksCli, "0.9.19");
     // anything else is refused BEFORE import runs (a pack shared between the CLI's check and the upload would
     // otherwise go through): an older CLI, a prerelease, extra text, no answer; exit 2, nothing uploaded
     for (const v of ["0.9.17", "decks 0.9.17", "0.9.18-rc.1", "0.9.18+build.1", "v0.9.18", "0.9.18 (beta)", "1.2", "not a version", ""]) {
@@ -272,9 +272,10 @@ test("export runs Hyperdecks' own CLI with an argv array, always env + account +
     let versionAsked = 0;
     const counting = { ...ctx, execFile: (bin, a, o, cb) => { if (a[0] === "--version") versionAsked++; return execFile(bin, a, o, cb); } };
     const before = calls.length;
+    globalThis.__hdVersion = "0.9.18";
     const held = await run(counting, ["characters", "export", "local/beacon", ...args.slice(3)]);
     assert.deepEqual([held.code, held.json.ok, held.json.code, held.json.needs, held.json.uploaded, held.json.receipt], [2, false, "hyperdecks-unsupported", "0.9.19", false, undefined], held.stdout);
-    assert.match(held.json.error, /0\.9\.18 cannot show this head: masked-face speech \(indicator\) need 0\.9\.19/);
+    assert.match(held.json.error, /0\.9\.18 cannot show this head: masked-face speech \(indicator\) and bake 19 heads .* need 0\.9\.19/);
     assert.equal(calls.length, before, "import never ran for a masked head on 0.9.18");
     assert.equal(versionAsked, 1, "the CLI was asked its version, once");
     globalThis.__hdVersion = "0.9.19";
@@ -291,7 +292,7 @@ test("export runs Hyperdecks' own CLI with an argv array, always env + account +
     globalThis.__hdVersion = "0.9.18";
     const oldCli = await run(ctx, ["characters", "export", "fixture/snagtooth", ...args.slice(3)]);
     assert.deepEqual([oldCli.code, oldCli.json.code, oldCli.json.needs, oldCli.json.uploaded], [2, "hyperdecks-unsupported", "0.9.19", false], oldCli.stdout);
-    assert.match(oldCli.json.error, /attached mouth pieces \(bake 19\)/);
+    assert.match(oldCli.json.error, /bake 19 heads \(attached mouth pieces/);
     globalThis.__hdVersion = "0.9.19";
     reply = (m) => ({ ...ok(m), bakeVersion: 19 });
     const anchored = await run(ctx, ["characters", "export", "fixture/snagtooth", ...args.slice(3)]);

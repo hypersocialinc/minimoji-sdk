@@ -843,6 +843,21 @@ export function Reacting({ avatar }: { avatar: AvatarInput }) {
   reduced motion keeps the scanlines dark. A head of skin ignores it. On the
   vanilla bundle: `mountHeadPerformance(el, { crt: 0 })`; on a runtime,
   `life.setScreenCrt(level)`.
+- **D.A.S.H. as an agent** (bake 19): `agentState` makes his screen show what
+  an agent is doing. `'thinking'` is a wave of three neon dots in his
+  theme's colours; `'working'` is code flowing up a line every 0.35 s;
+  `'needsYou'` is one big glitching neon `!` in place of his face; the rest
+  are his face in the state's colour on dark glass: `'waiting'` (eyes up, a `…` mouth), `'done'`
+  (a check that stays), `'errored'` (`> <` eyes, a zigzag mouth, an RGB
+  glitch), `'asleep'` (closed eyes). `'needs-you'` works too. Each state
+  has its own colour; pass your app's with `screenColor="#ff9f43"` (and
+  `screenGlass`: about `.3` keeps the glass dark so only the face lights,
+  `2.2` floods it). `null` (the default) leaves the screen exactly as it
+  was, and a head of skin ignores both. Vanilla bundle:
+  `mountHeadPerformance(el, { agentState: 'working' })`, then
+  `stage.setAgentState('done')` / `stage.setScreenColor('#4ade80', { glass: .3 })`;
+  on a runtime, `life.setAgentState(state, { color, glass })` and
+  `life.setScreenColor(hex, { glass })`.
 - `cue={{ gesture }}` plays one named track over the face as it is (the
   face never changes): `double-take`, `head-shake`, `sunny-nod`,
   `knowing-nod`, `ponder-tilt`, `side-eye-hmm`, `lightbulb`, … (the

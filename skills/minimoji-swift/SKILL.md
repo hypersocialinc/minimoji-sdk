@@ -410,6 +410,18 @@ cue = HeadCue(.forMood("laugh"), generation: cues)       // one of laugh's three
   `1` (the default), `2` loud. Reduce Motion keeps the scanlines dark. A
   head of skin ignores it. On a `FaceLife` you drive yourself:
   `setScreenCrt(_:)`.
+- D.A.S.H. as an agent (bake 19): `agentState:` on `MinimojiMetalHeadView`
+  (`AgentState`) makes his screen show what an agent is doing. `.thinking` is
+  a wave of three neon dots in his theme's colours; `.working` is code
+  flowing up; `.needsYou` is one big glitching neon `!` in place of his face;
+  the rest are his face in the state's colour on dark glass: `.waiting` (eyes up, a `…`
+  mouth), `.done` (a check that stays), `.errored` (`> <` eyes, a zigzag
+  mouth, an RGB glitch), `.asleep` (closed eyes). Each state has its own
+  colour; pass your app's with `screenColor: "#ff9f43"` and `screenGlass:`
+  (about `0.3` keeps the glass dark, `2.2` floods it). `nil` (the default)
+  leaves the screen exactly as it was, and a head of skin ignores both. A
+  string from a server: `AgentState(id: "needs-you")`. On a `FaceLife`:
+  `setAgentState(_:color:glass:)` and `setScreenColor(_:glass:)`.
 - Over a host's beat (a `performance:` source with `beat`), a cue rides over
   the nod and the nod keeps the beat. A singing app leaves `performances`
   on, passes `emotes: false`, and cues a nod or a double take on its moments.

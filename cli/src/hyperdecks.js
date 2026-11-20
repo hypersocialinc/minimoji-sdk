@@ -24,11 +24,12 @@ const atLeast = (version, min) => {
 export function failsClosed(version) { return atLeast(version, FAILS_CLOSED_FROM); }
 // From 0.9.19 (Hyperdecks #274) the destination shows a masked head's speech (indicator) and attached mouth
 // pieces (bake 19): its player runs the official Minimoji heads runtime that has them and its import accepts
-// bake 19. Such a head is refused for an older CLI before anything is imported.
+// bake 19. Such a head is refused for an older CLI before anything is imported. Since D.A.S.H.'s agent screens
+// bake 19 is every head's version, so every export needs 0.9.19.
 export const RUNTIME_FEATURES_FROM = "0.9.19";
 /** what a head file needs from the destination: indicator speech or bake 19 need RUNTIME_FEATURES_FROM */
 export function hyperdecksNeeds({ bakeVersion, speech }) {
-  const why = [speech === "indicator" && "masked-face speech (indicator)", bakeVersion >= 19 && "attached mouth pieces (bake 19)"].filter(Boolean);
+  const why = [speech === "indicator" && "masked-face speech (indicator)", bakeVersion >= 19 && "bake 19 heads (attached mouth pieces, D.A.S.H.'s agent screens)"].filter(Boolean);
   return why.length ? { min: RUNTIME_FEATURES_FROM, why } : { min: FAILS_CLOSED_FROM, why: [] };
 }
 

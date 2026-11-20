@@ -54,6 +54,11 @@ export interface HeadPerformanceOptions {
   poster?: HeadPoster | string | null;
   /** a screen face's (D.A.S.H.'s) CRT look, scanlines and glass following the mood: 0 off, 1 (the default), 2 loud. A head of skin ignores it */
   crt?: 0 | 1 | 2;
+  /** what D.A.S.H.'s screen shows for an agent (bake 19): 'thinking' | 'working' | 'needsYou' | 'waiting' | 'done' |
+   *  'errored' | 'asleep'; null (the default) leaves the screen as it was. A head of skin ignores it */
+  agentState?: string | null;
+  /** a screen face's glass colour over every mood and agent state, `#rrggbb`; null leaves it */
+  screenColor?: string | null;
   /** a packed character's colours by slot for the solo `bakedHead`, `{ trim: '#7a3cff' }` (see `prepared.slots`);
    *  throws on an unknown slot or a head with no slot map */
   colors?: Readonly<Record<string, string>> | null;
@@ -114,6 +119,10 @@ export interface HeadPerformanceStage {
   /** recolour the solo baked head by colour slot, live (no reload); throws on an unknown slot, a colour that is not
    *  #rrggbb or a head with no slot map. A slot with no parts on this variant changes nothing */
   setColors(colors: Readonly<Record<string, string>>): void;
+  /** D.A.S.H.'s screen shows what an agent is doing (see `agentState`); `color`/`glass` override the state's own colour */
+  setAgentState(state: string | null, opts?: { color?: string; glass?: number }): void;
+  /** light a screen face's glass in `hex` over every mood (`glass`: ≈.3 dark, 2.2 flooded); null hands it back */
+  setScreenColor(hex: string | null, opts?: { glass?: number }): void;
   /** put a live source on a head (`setPerformance(await liveMic())`): its mouth is the head's while it talks, and the
    *  stage draws its own frames while one is set. null takes it off; `id` picks a tile */
   setPerformance(source: LiveMicSession | { performance(t?: number): unknown } | ((t: number) => unknown) | null, id?: string): void;

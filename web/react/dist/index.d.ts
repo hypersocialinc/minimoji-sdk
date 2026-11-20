@@ -85,6 +85,9 @@ export interface PerformanceSnapshot {
 export type TalkStyle = 'arcs' | 'lines' | 'mouth';
 /** a screen face's CRT strength: 0 off, 1 the default, 2 loud */
 export type ScreenCrt = 0 | 1 | 2;
+/** what D.A.S.H.'s screen shows for an agent (bake 19): a thinking wave, working code flowing up, or his face in the
+ *  state's colour on dark glass ('needs-you' and 'needs_you' are 'needsYou') */
+export type AgentState = 'thinking' | 'working' | 'needsYou' | 'needs-you' | 'waiting' | 'done' | 'errored' | 'asleep';
 /** sampled once per rendered frame, right before the head's update; `t` is the stage clock in seconds */
 export type PerformanceInput = (t: number) => PerformanceSnapshot | null | undefined;
 
@@ -241,6 +244,14 @@ export interface FaceApi {
   setScreenCrt(level: ScreenCrt): void;
   /** the CRT strength, null on a head of skin */
   screenCrt(): ScreenCrt | null;
+  /** light a screen face's glass in `hex` over every mood: `glass` ≈.3 keeps it dark, 2.2 floods it (default 1).
+   *  null hands it back to the mood (or the agent state's own colour); it wins over an agent state's colour */
+  setScreenColor(hex: string | null, opts?: { glass?: number }): void;
+  screenColor(): { hex: string; glass: number } | null;
+  /** what D.A.S.H.'s screen shows for an agent; null for none. Sets the state's base face and screen colour
+   *  (`color`/`glass` override it). Unknown ids and heads of skin ignore it */
+  setAgentState(state: AgentState | null, opts?: { color?: string; glass?: number }): void;
+  agentState(): Exclude<AgentState, 'needs-you'> | null;
   /** an unknown style is ignored */
   setTalkStyle(style: TalkStyle): void;
   talkStyle(): TalkStyle;
@@ -367,6 +378,14 @@ export interface MinimojiHeadProps {
   /** a screen face's (D.A.S.H.'s) CRT look, its scanlines and glass following the mood: 0 off, 1 (the default), 2 loud.
    *  A head of skin ignores it */
   crt?: ScreenCrt;
+  /** what D.A.S.H.'s screen shows for an agent (bake 19): 'thinking' (a wave of three neon dots), 'working' (code flowing
+   *  up), or his face for 'needsYou' | 'waiting' | 'done' | 'errored' | 'asleep' in the state's colour. null (the default)
+   *  leaves the screen exactly as it was. A head of skin ignores it */
+  agentState?: AgentState | null;
+  /** a screen face's glass colour over every mood and agent state, `#rrggbb` (e.g. your app's own state colour); null leaves it */
+  screenColor?: string | null;
+  /** how much of the glass `screenColor` takes: ≈.3 keeps it dark (only the face lights), 2.2 floods it; default 1 */
+  screenGlass?: number;
   /** how loud the voice is right now, 0..1 (null: none): drives the sound arcs directly, not the jaw, and is kept
    *  fresh every frame. A call's level meter goes here; while a live `performance` source names its own level, that one wins */
   voiceLevel?: number | null;
