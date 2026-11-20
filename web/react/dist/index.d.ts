@@ -321,16 +321,20 @@ export interface ManualClock {
   readonly steps: number;
   /** move every clock by `dt` seconds (finite, ≥ 0) and draw one frame on every stage on this clock; answers the time */
   step(dt: number): number;
-  /** resolves once nothing the next frame depends on is still loading */
+  /** resolves once nothing the next frame depends on is still loading; rejects when a held load failed (an Error
+   *  naming each, `failed` lists them), reported once */
   readonly ready: Promise<void>;
   /** a seeded random source of its own for `salt` */
   random(salt?: string): () => number;
   /** run `fn` on every step; answers the unsubscribe */
   onStep(fn: (dt: number, time: number) => void): () => void;
-  /** have `ready` wait for a load of yours too; answers the promise as given */
-  hold<T>(promise: Promise<T>): Promise<T>;
+  /** have `ready` wait for a load of yours too (and reject, naming `what`, if it fails); answers the promise as given */
+  hold<T>(promise: Promise<T>, what?: string): Promise<T>;
 }
-/** a stepped clock: `seed` deals the dice (blinks, glances, which emote plays) of every head on it (default 1) */
+/** a stepped clock. `seed` deals the dice of every head on it (default 1): when it blinks, where the eyes glance, which
+ *  emote of a mood plays, a poke's reaction. Two recordings match only with the same seed: derive it from a stable id
+ *  for the content (a deck's id, a slide's id plus a speaker), never from `location`, a URL or a served path (a server
+ *  that serves each run under a fresh prefix gives every run other blinks) */
 export function createManualClock(options?: { seed?: number }): ManualClock;
 
 /** a poke's answer: a face held a moment and a short move on the head (no sound: play your own from `onPoke`) */

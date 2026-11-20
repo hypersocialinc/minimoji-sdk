@@ -1097,13 +1097,40 @@ for (let i = 0; i < 300; i++) { stage.step(1 / 30); await recordFrame(stage.capt
 - **Audio**: a line on a stepped clock never plays (no element is made for
   a URL, a host's element is never played). Mux the clip into the video
   yourself, offset to the frame you started the line on.
+- **The seed** deals every head's dice on the clock: when it blinks, where
+  the eyes glance, which emote of a mood plays, a poke's reaction. Two
+  recordings match only with the same seed, so derive it from a stable id
+  for the content (a deck's id, a slide's id plus the speaker), never from
+  `location`, a URL or a served path: a server that serves each run under a
+  fresh prefix gives every run other blinks.
 - **Wait for `ready`** (`clock.ready`, or `stage.ready` on the vanilla stage)
   before the first step you keep: lazy loads (a sculpted cut, the sticker
-  file and its PNGs, a clip still building) land on the wall clock, and a
-  frame stepped before them would draw without them.
+  file and its PNGs, a line being loaded or built) land on the wall clock, and
+  a frame stepped before them would draw without them. **Selecting a line
+  while you record** (the next slide's)? Await `clock.ready` before *every*
+  step: the line's load is held on the clock, so it then starts on the same
+  step every run. Hold a load of your own the frames wait on with
+  `clock.hold(promise, 'what it is')`.
+- **`ready` rejects** when a load failed (the sculpted parts, a line), with
+  an Error naming each (`error.failed`), reported once, so a retry reads a
+  clean `ready`. Stickers are decoration: a failed sticker file only warns.
+- **The first frame is drawn at `ready`** (vanilla stage): the canvas holds
+  the head as mounted, with no step, so a page screenshot before your first
+  step shows it. On the vanilla stage `step(0)` only redraws the frame as
+  it stands (nothing moves, no line ticks, no dice), so it never changes
+  the frames that follow.
+- **Your own media as the timebase**: its `currentTime` is read snapped to
+  10 µs on a stepped stage, so float noise in a host clock (a page clock
+  frozen at another wall time each run) cannot tip a step that lands on a
+  line's frame edge into the next frame.
 - **The poster** stays until `stage.ready` resolves, then leaves at once
   (no fade, no puff). A frame stepped before `ready` records it under the
   head: only do that if you want it.
+- **Your own object as the voice's `stage`** (one that forwards the calls,
+  or a head you mount again after a lost WebGL context):
+  `voice.attach(stage)` points the voice at the stepped stage's clock and
+  drive, and again at the new stage after a remount; the line goes on from
+  where it was. The calls still go to the object you made it with.
 - `stage.capture()` answers the frame just drawn as `ImageData`, stickers
   included, with the stage's transparency (flatten it on your background).
 - **React: yield between steps** (await your frame capture, or

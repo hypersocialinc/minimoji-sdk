@@ -82,16 +82,22 @@ export interface ManualClock {
   readonly steps: number;
   /** move every clock by `dt` seconds (finite, ≥ 0) and draw one frame on every stage on this clock; answers the time */
   step(dt: number): number;
-  /** resolves once nothing held on this clock is still loading */
+  /** resolves once nothing held on this clock is still loading (a stage's sculpted parts and stickers, a voiced
+   *  performance's line being loaded or built). Rejects when a held load failed: an Error naming each (`failed` lists
+   *  them), reported once, so a retry reads a clean `ready`. Wait for it before every step if a line can be selected
+   *  while you record: the line then starts on the same step every run */
   readonly ready: Promise<void>;
   /** a seeded random source of its own for `salt` */
   random(salt?: string): () => number;
   /** run `fn` on every step; answers the unsubscribe */
   onStep(fn: (dt: number, time: number) => void): () => void;
-  /** have `ready` wait for a load of yours too; answers the promise as given */
-  hold<T>(promise: Promise<T>): Promise<T>;
+  /** have `ready` wait for a load of yours too (and reject, naming `what`, if it fails); answers the promise as given */
+  hold<T>(promise: Promise<T>, what?: string): Promise<T>;
 }
-/** a stepped clock: `seed` deals the dice (blinks, glances, which emote plays) of every head on it (default 1) */
+/** a stepped clock. `seed` deals the dice of every head on it (default 1): when it blinks, where the eyes glance, which
+ *  emote of a mood plays, a poke's reaction. Two recordings match only with the same seed: derive it from a stable id
+ *  for the content (a deck's id, a slide's id plus a speaker), never from `location`, a URL or a served path (a server
+ *  that serves each run under a fresh prefix gives every run other blinks) */
 export function createManualClock(options?: { seed?: number }): ManualClock;
 
 /** a poke's answer: a face held a moment and a short move on the head (no sound: play your own from `onPoke`) */
@@ -127,7 +133,11 @@ export interface HeadPerformanceStage {
    *  stage draws its own frames while one is set. null takes it off; `id` picks a tile */
   setPerformance(source: LiveMicSession | { performance(t?: number): unknown } | ((t: number) => unknown) | null, id?: string): void;
   /** resolves (to the stage) once every lazy load a frame depends on is in: the sculpted parts (and the head rebuilt
-   *  with them), the sticker scripts (minimoji-heads-bursts.js) and their sprites. On a stepped stage the poster then leaves */
+   *  with them), the sticker scripts (minimoji-heads-bursts.js) and their sprites. A stepped stage's rejects, naming
+   *  them, when the sculpted parts failed (the head draws its fallback; the stage's ready and its clock's each report
+   *  it once; stickers are decoration and never fail it); a live stage's always resolves. On a stepped stage
+   *  the poster then leaves at once and the canvas holds the first frame, with no step (the head as mounted, at time 0);
+   *  `step(0)` only redraws the frame as it stands: nothing moves, no line ticks, no dice are dealt */
   readonly ready: Promise<HeadPerformanceStage>;
   /** the stepped clock the stage runs on, or null */
   readonly clock: ManualClock | null;
@@ -188,9 +198,12 @@ export function createVoicedPerformance(options: {
    *  whose currentTime is your recorder's clock); left out, the line runs on the stage's clock with no element */
   createMedia?: (url: string) => HTMLMediaElement;
   /** a stepped stage's timebase, when you want to say it: 'media' (needs createMedia) or 'clock'. Default: 'media'
-   *  when createMedia is given, else 'clock'. A live stage is always 'media' */
+   *  when createMedia is given, else 'clock'. A live stage is always 'media'. Made on an object of your own to
+   *  `attach` a stepped stage to: say 'clock' here to run on its clock with no element */
   timebase?: 'media' | 'clock';
   loadTimeline: (url: string, signal: AbortSignal) => Promise<unknown>;
+  /** the stage the calls go to (frame, reset, setMood, emote, gesture, look, brow): a stage, or an object of your own
+   *  that forwards them. A stepped stage's clock and drive are read from it, or given with `attach(stage)` */
   stage: unknown;
   changed?: (state: unknown) => void;
   claimVoice?: () => void;
@@ -214,8 +227,12 @@ export function createVoicedPerformance(options: {
   readonly timebase: 'media' | 'clock';
   pause(): void;
   stop(): void;
+  /** load a line (held on a stepped stage's clock until it has landed, so `clock.ready` waits for it) */
   select(next: unknown): Promise<void>;
   prepare(next: unknown): Promise<SpeechLine>;
+  /** point the voice at a stepped stage's clock and drive: for a `stage` of your own (it still gets the calls) or a
+   *  head mounted again (the line goes on from where it was). Throws unless `stage` is stepped */
+  attach(stage: HeadPerformanceStage): void;
   /** mute or unmute the live element at once and every later run's (a muted head still talks: the clock is the element's) */
   setMuted(muted: boolean): void;
   /** the volume (0..1, clamped) of the live element at once and every later run's */
