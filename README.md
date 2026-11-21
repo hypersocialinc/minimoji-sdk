@@ -56,6 +56,18 @@ Node 20 or later, no dependencies. Prefer no global install? Run
 
 `@minimoji/react` and `@minimoji/heads` (`web/react`, `web/heads`):
 
+- **19.2.1**: a head's canvas follows its anchor both ways. A resting head whose anchor shrank while an ancestor's
+  transform was still easing (a pane header closing with a scale, a FLIP) kept the canvas it was sized with mid-way,
+  drawn oversized until remounted; the stage now follows a surface until its size stops changing, and wakes on an
+  ancestor's transform transition or animation. A head inside a scaled container is sized by what the screen shows:
+  sharp, and its own size (the backing store follows the screen, the canvas's css box the layout). `ref` on
+  `<MinimojiStage>` gives `resize()` (also `useStage().resize()`), for a move no event reports: an ancestor's transform
+  set with no transition, a canvas library's own zoom.
+  **Visible change for a head under a scaled ancestor** (a deck stage scaled to fit, a zoomed pane): before, its
+  canvas was scaled twice, so under `scale(.5)` the head drew at about a quarter of its size, off centre, and under
+  `scale(1.5)` oversized and hanging out of its tile. Now it is its anchor's size, centred and sharp. A host that
+  compensated for the old size should drop that. An unscaled page is pixel-identical to 19.2.0 (every canvas hash
+  the same on the small-heads page).
 - **19.2.0**: ten small D.A.S.H. heads appear in about a second. A D.A.S.H. build took most of a second (every
   surface pick tested every triangle of its cage, and every plate was extruded anew for every head); the first now
   takes about 0.2–0.35 s and each one after it about 50–120 ms, the same heads to the byte. A resting head is drawn at its final size from its first

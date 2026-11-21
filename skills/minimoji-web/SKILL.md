@@ -120,6 +120,16 @@ export function Dash() {
   anchor, so heads scroll with the page on the compositor. Mark an ancestor
   `data-minimoji-surface` to have its heads share one canvas: do it for a
   group shot, and wherever the anchor clips its overflow.
+- **Sizing**: a head's canvas is sized by what the screen shows of its
+  anchor, an ancestor's `transform` or css `zoom` included: the backing
+  store is the on-screen box in device pixels, the canvas's css box that
+  box in the anchor's own coordinates. A head in a scaled container is
+  sharp and its own size. The stage follows an anchor resized, and an
+  ancestor's transform that transitions or animates, until it stops
+  moving; for a move no event reports (a transform set with no transition,
+  a canvas library's own zoom) call `resize()` on a `ref` to
+  `<MinimojiStage>` (or `useStage().resize()` inside it). A rotated
+  ancestor is not handled.
 
 ## 3. Showing a head while it loads
 
@@ -1081,8 +1091,11 @@ export function CrewRail({ crew }: { crew: Agent[] }) {
   15 is the rate the patterns were checked at. Every other agent state is held at a clean moment of its screen
   (the `!` lit, the check without its sparkles, the `…` full).
 - What wakes a held stage: a prop change, a scroll (the page's or a box
-  inside it), a window resize, an anchor resized or scrolled into view, a
-  device-pixel-ratio change, a poke. Nothing else; the pointer does not.
+  inside it), a window resize, an anchor resized or scrolled into view, an
+  ancestor's transform transition or animation, a device-pixel-ratio change,
+  a poke, `resize()` on the stage's `ref`. Nothing else; the pointer does not.
+  Woken, it draws until every anchor's size stops changing, so a head is
+  held at the size it lands on, never one it passed through.
 - Held only when the head has a canvas of its own (the default `surfaces`,
   its anchor not inside a `data-minimoji-surface`); otherwise it keeps
   drawing. Driving `head.life` yourself (`think`, `setPresence`, `lookAt`)

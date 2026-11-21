@@ -317,6 +317,16 @@ export interface MinimojiStageProps {
   style?: CSSProperties;
   className?: string;
   children?: ReactNode;
+  /** the stage's handle: `resize()` (see MinimojiStageHandle) */
+  ref?: React.Ref<MinimojiStageHandle>;
+}
+/** what a `ref` on <MinimojiStage> holds */
+export interface MinimojiStageHandle {
+  /** re-measure and redraw every head now, each head's canvas re-sized for where its anchor is. The stage already
+   *  follows an anchor resized (ResizeObserver), the window, the DPR, a scroll, and an ancestor's transform that
+   *  transitions or animates (until its size stops changing); call this when you move or scale the heads in a way
+   *  none of those report — an ancestor's transform set with no transition, a canvas library's own zoom. A stepped stage (`clock`) sizes every canvas at each step: there it does nothing */
+  resize(): void;
 }
 export function MinimojiStage(props: MinimojiStageProps): ReactNode;
 
@@ -585,6 +595,8 @@ export interface StageContextValue {
   /** read the page here, not from a scroll listener: `fn` runs once per rendered frame, just before the
    *  frame it feeds. Returns the way to stop watching. */
   watch(fn: () => void): () => void;
+  /** the same as MinimojiStageHandle.resize(), from inside the stage */
+  resize(): void;
 }
 export function useStage(): StageContextValue;
 
