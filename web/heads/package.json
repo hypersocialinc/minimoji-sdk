@@ -1,6 +1,6 @@
 {
   "name": "@minimoji/heads",
-  "version": "19.0.0",
+  "version": "19.1.0",
   "description": "Mini avatar heads for any web page, no React or bundler needed: one ESM file with three.js inside.",
   "type": "module",
   "sideEffects": false,

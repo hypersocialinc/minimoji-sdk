@@ -1,6 +1,6 @@
 {
   "name": "@minimoji/react",
-  "version": "19.0.0",
+  "version": "19.1.0",
   "description": "Mini avatar heads for React: one <MinimojiStage> per page, <MinimojiHead> anchored anywhere in it, talking lines. The engine ships bundled and minified.",
   "type": "module",
   "sideEffects": [

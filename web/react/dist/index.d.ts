@@ -298,6 +298,11 @@ export interface MinimojiStageProps {
    *  by default. For a strict CSP, serve your own copy of the package's `emote-bursts/` folder
    *  (`node_modules/@minimoji/react/emote-bursts/`) and point this at it, e.g. `"/emote-bursts/"` */
   burstBase?: string;
+  /** frames per second while the only heads moving are small `rest` heads (anchor ≤ 56 px) playing D.A.S.H.'s
+   *  `thinking` or `working` screen; default 15, at most 30. Between frames the stage asks for no animation frame at
+   *  all. Anything else moving (a head without `rest`, a change playing out, a larger head) draws at the usual 30.
+   *  12 costs about a fifth less (one working 30 px head among nine at rest: ~2% → ~1.6–2.1% of a main thread) */
+  restFps?: number;
   /** RECORD FRAME BY FRAME (video export): a stepped clock from `createManualClock({ seed })`. The stage then runs no
    *  loop of its own and reads no wall clock or pointer: nothing advances and nothing draws until `clock.step(dt)`, each
    *  step is one frame advanced by exactly `dt`, heads open on themselves (no landing), and the same seed and the same
@@ -360,6 +365,9 @@ export interface MinimojiHeadHandle {
   react(name?: Reaction): Reaction | null;
   /** the head, once built */
   head: Head | null;
+  /** a head at `rest`: draw again, after driving it through `head.life` yourself (think, setPresence, lookAt…), which
+   *  no prop change announces. It draws the change, lets it play out and is held again */
+  wake(): void;
 }
 
 export interface MinimojiHeadProps {
@@ -438,6 +446,16 @@ export interface MinimojiHeadProps {
   decorations?: boolean;
   shadow?: boolean;
   scale?: number;
+  /** AT REST: a status head in an app's chrome that costs nothing while nothing changes. The head is built without
+   *  its breath and drift and looks straight out (an `{x,y}` look or 'manual' still applies; 'mouse', 'near' and
+   *  'idle' do not); a change — expression, agentState, screenColor, a cue, talking, a resize — is drawn, plays out
+   *  (about a second and a half) and is held. When every head on the stage is held, the stage asks for no animation
+   *  frame and issues no WebGL draw until something changes. D.A.S.H.'s 'thinking' and 'working' are patterns and
+   *  keep drawing while shown; every other agent state is held at a clean moment of its screen. Held only in a
+   *  canvas of its own (the default `surfaces`, an anchor not inside a `data-minimoji-surface`); elsewhere it keeps
+   *  drawing. Driving `head.life` yourself: call `ref.wake()` after. Default false
+   *  (heads breathe, blink and glance as always). Changing it rebuilds the head: set it once */
+  rest?: boolean;
   onFrame?: (head: Head, t: number, offsets: HeadOffsets) => void;
   onReady?: (head: Head) => void;
   /** the build threw (also logged): the head on stage, if any, is the one before */

@@ -52,6 +52,21 @@ Node 20 or later, no dependencies. Prefer no global install? Run
 [cli/README.md](cli/README.md) has every command, including `minimoji login`,
 `minimoji init` for your app's key and `minimoji generate` to make an avatar.
 
+## Web SDK release notes
+
+`@minimoji/react` and `@minimoji/heads` (`web/react`, `web/heads`):
+
+- **19.1.0**: small heads that cost nothing at rest. `rest` on `<MinimojiHead>` draws a change, lets it play out
+  and holds still; a stage whose heads are all held asks for no animation frame and issues no WebGL draw. Only the
+  heads that move are drawn, and small resting heads playing D.A.S.H.'s `thinking` or `working` screen draw at
+  `<MinimojiStage restFps>` (default 15). Ten idle 30–56 px heads: 0 frames; one working among nine at rest: about
+  2% of a main thread in Electron. Runs under a strict CSP in Electron (no `unsafe-eval`). Opt-in; nothing changes
+  without it.
+  Also: agent states on every Mini avatar, not just D.A.S.H. (`agentState` on a person, an animal, the ghost or the
+  penguin: a face it already has, a gesture now and then, and one held sticker).
+- **19.0.0**: D.A.S.H. agent states (`agentState`: thinking, working, needsYou, waiting, done, errored, asleep) and
+  `screenColor`. Never published to npm: 19.1.0 carries everything in it.
+
 ## The skills
 
 Skills are instructions, examples and supporting files that teach your coding

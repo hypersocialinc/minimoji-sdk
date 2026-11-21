@@ -1003,6 +1003,82 @@ the Swift Kit's `MinimojiBody`, or ask Minimoji.
   the head: set them once, not per frame. `emotes` is live (no rebuild). A changed `avatar` whirls the new head in.
 - One voice at a time: stop the other heads' audio when one starts.
 
+### Status heads in an app's chrome (`rest`)
+
+A crew rail, pane pills, a sidebar of agents: small heads that sit open all
+day and should cost nothing while nothing happens. Put `rest` on each one.
+
+```tsx
+'use client';
+import { useRef, type RefObject } from 'react';
+import { MinimojiStage, MinimojiHead, type AgentState } from '@minimoji/react';
+
+type Agent = { id: string; name: string; theme: string; state: AgentState | null };
+
+export function CrewRail({ crew }: { crew: Agent[] }) {
+  const anchors = useRef(new Map<string, RefObject<HTMLDivElement | null>>());
+  const anchor = (id: string) => {
+    if (!anchors.current.has(id)) anchors.current.set(id, { current: null });
+    return anchors.current.get(id)!;
+  };
+  return (
+    <>
+      {crew.map(a => (
+        <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div ref={anchor(a.id)} style={{ width: 30, height: 30 }} />
+          {a.name}
+        </div>
+      ))}
+      <MinimojiStage>
+        {crew.map(a => (
+          <MinimojiHead key={a.id} avatar={{}} character={{ id: a.theme }} anchor={anchor(a.id)}
+            agentState={a.state} rest shadow={false} bursts={false} />
+        ))}
+      </MinimojiStage>
+    </>
+  );
+}
+```
+
+`theme` is a D.A.S.H. id: `agent`, `dashGold`, `dashRose`, `dashOcean`, …
+
+- A resting head is built without its breath and drift and looks straight
+  out of its tile (`look` as `{x,y}` or `'manual'` still applies). A change
+  (`agentState`, `expression`, `screenColor`, a cue, talking, a resize) is
+  drawn, plays out for about a second and a half, and is held.
+- When every head on the stage is held, the stage asks for no animation
+  frame and issues no WebGL draw at all until something changes. Ten idle
+  D.A.S.H. heads: 0 frames and 0 draws, against 120 rAF/s and ~12% of a
+  main thread without `rest`.
+- `'thinking'` and `'working'` are patterns: a head showing one keeps the
+  stage drawing while it does, and only that head is drawn: the held heads
+  beside it are left out of the render and keep their pixels. A small one
+  (anchor ≤ 56 px) draws at the stage's `restFps` (default 15; at most 30),
+  with no animation frame asked for in between. One working 30 px head
+  among nine at rest: about 2% of a main thread in Electron (1.9–2.5%
+  across runs), against 13.6% without `rest`. For margin, set
+  `<MinimojiStage restFps={12}>`: about a fifth less (0.4–0.5 points);
+  15 is the rate the patterns were checked at. Every other agent state is held at a clean moment of its screen
+  (the `!` lit, the check without its sparkles, the `…` full).
+- What wakes a held stage: a prop change, a scroll (the page's or a box
+  inside it), a window resize, an anchor resized or scrolled into view, a
+  device-pixel-ratio change, a poke. Nothing else; the pointer does not.
+- Held only when the head has a canvas of its own (the default `surfaces`,
+  its anchor not inside a `data-minimoji-surface`); otherwise it keeps
+  drawing. Driving `head.life` yourself (`think`, `setPresence`, `lookAt`)
+  announces nothing: call `ref.current.wake()` after.
+- `rest` is opt-in at any size, and set once: changing it rebuilds the head.
+  Without it heads breathe, blink and glance exactly as before.
+- `shadow={false}` on every head (and no `<MinimojiShadow>`) also skips the
+  stage's shadow pass while it draws.
+- **Electron**: works with `contextIsolation`, `sandbox` and a strict CSP,
+  from `file://` or a custom protocol, no `unsafe-eval`:
+  `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'`.
+  A D.A.S.H. head needs no network. Only the comic stickers fetch (images
+  from `https://www.minimoji.com/emote-bursts/` on a mood change): pass
+  `bursts={false}`, add that origin to `img-src`, or serve the package's
+  `emote-bursts/` folder yourself with `<MinimojiStage burstBase>`.
+
 ### A baked head (a bake's GLB, no avatar document)
 
 When you hold a bake rather than a document (`GET /avatars/<key>.glb`, or
