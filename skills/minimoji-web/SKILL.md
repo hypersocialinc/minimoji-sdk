@@ -863,12 +863,21 @@ export function Reacting({ avatar }: { avatar: AvatarInput }) {
   penguin) shows the state with its own face and one held sticker beside it,
   in the state's colour (or yours, from `screenColor`): `'thinking'` the
   thinking face and a thought bubble; `'working'` the happy face typing on a
-  small keyboard in front of it, a soft code flow behind the head, and every
-  few seconds a look up and aside with the bubble; `'needsYou'` surprised with
+  small keyboard in front of it, real code flowing up behind the head
+  (monospace, syntax-coloured, a line every .35 s, still while it thinks), and
+  every few seconds a look up and aside with the bubble; `'needsYou'` surprised with
   one `!` standing behind the head; `'waiting'` a glance up and a clock in a thought bubble; `'done'` a nod and a check behind the head that stays; `'errored'` X eyes, a head shake every 3 s and a ✕ in a thought bubble; `'asleep'` the gentle asleep pose with Zs rising beside it. Clearing it hands back
   the neutral face. Same prop, same `stage.setAgentState` / `life.setAgentState`;
   `life.agentStickers()` is what the sticker layer draws (`decorations={false}`
   draws none). Runtime only: any bake works.
+- **The code flow follows your theme**: `theme="light" | "dark"` on
+  `<MinimojiStage>` (every head) or `<MinimojiHead>` (that head; it wins) gives
+  the code deeper ink on a light surface and brighter neon on a dark one.
+  `null` (the default) follows the page's `prefers-color-scheme`, so set it
+  whenever your app's theme can differ from the system's (an in-app toggle).
+  Under about 40 css px each line draws as one coloured bar per token, since
+  glyphs that small speckle. Vanilla bundle: `mountHeadPerformance(el, { theme: 'dark' })`,
+  then `stage.setTheme('light')`.
 - `cue={{ gesture }}` plays one named track over the face as it is (the
   face never changes): `double-take`, `head-shake`, `sunny-nod`,
   `knowing-nod`, `ponder-tilt`, `side-eye-hmm`, `lightbulb`, … (the

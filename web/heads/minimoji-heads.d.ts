@@ -58,6 +58,10 @@ export interface HeadPerformanceOptions {
    *  D.A.S.H.'s screen shows it (bake 19); any other head its own face and one held sticker (working: a keyboard).
    *  null (the default) leaves the head as it was */
   agentState?: string | null;
+  /** your surface's theme: the agent 'working' code flow behind a head without a screen is syntax-coloured code in
+   *  deeper ink on 'light' and brighter neon on 'dark' (one bar per token under ~40 css px). null (the default) follows
+   *  the page's prefers-color-scheme; `stage.setTheme` changes it live */
+  theme?: 'light' | 'dark' | null;
   /** a screen face's glass colour over every mood and agent state, `#rrggbb`; null leaves it */
   screenColor?: string | null;
   /** a packed character's colours by slot for the solo `bakedHead`, `{ trim: '#7a3cff' }` (see `prepared.slots`);
@@ -130,6 +134,8 @@ export interface HeadPerformanceStage {
   setAgentState(state: string | null, opts?: { color?: string; glass?: number }): void;
   /** light a screen face's glass in `hex` over every mood (`glass`: ≈.3 dark, 2.2 flooded); null hands it back */
   setScreenColor(hex: string | null, opts?: { glass?: number }): void;
+  /** the surface the heads sit on (see `theme`); null follows the page's prefers-color-scheme */
+  setTheme(theme: 'light' | 'dark' | null): void;
   /** put a live source on a head (`setPerformance(await liveMic())`): its mouth is the head's while it talks, and the
    *  stage draws its own frames while one is set. null takes it off; `id` picks a tile */
   setPerformance(source: LiveMicSession | { performance(t?: number): unknown } | ((t: number) => unknown) | null, id?: string): void;

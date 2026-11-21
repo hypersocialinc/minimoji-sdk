@@ -298,6 +298,10 @@ export interface MinimojiStageProps {
    *  by default. For a strict CSP, serve your own copy of the package's `emote-bursts/` folder
    *  (`node_modules/@minimoji/react/emote-bursts/`) and point this at it, e.g. `"/emote-bursts/"` */
   burstBase?: string;
+  /** your surface's theme, for what the heads draw in its colours: the agent 'working' code flow behind a head without
+   *  a screen takes deeper ink on 'light' and brighter neon on 'dark'. A head's own `theme` wins; null (the default)
+   *  follows the page's `prefers-color-scheme`. Set it whenever your app's theme can differ from the system's */
+  theme?: 'light' | 'dark' | null;
   /** frames per second while the only heads moving are small `rest` heads (anchor ≤ 56 px) playing D.A.S.H.'s
    *  `thinking` or `working` screen; default 15, at most 30. Between frames the stage asks for no animation frame at
    *  all. Anything else moving (a head without `rest`, a change playing out, a larger head) draws at the usual 30.
@@ -398,6 +402,10 @@ export interface MinimojiHeadProps {
    *  other head shows it with its own face and one held sticker in the state's colour (or `screenColor`); 'working' types
    *  on a small keyboard. null (the default) leaves the head exactly as it was */
   agentState?: AgentState | null;
+  /** the surface this head sits on: the 'working' code flow behind a head without a screen is syntax-coloured code in
+   *  deeper ink on 'light' and brighter neon on 'dark' (below ~40 css px, one bar per token). null (the default) takes
+   *  the stage's `theme`, then the page's `prefers-color-scheme` */
+  theme?: 'light' | 'dark' | null;
   /** a screen face's glass colour over every mood and agent state, `#rrggbb` (e.g. your app's own state colour); null leaves it */
   screenColor?: string | null;
   /** how much of the glass `screenColor` takes: ≈.3 keeps it dark (only the face lights), 2.2 floods it; default 1 */

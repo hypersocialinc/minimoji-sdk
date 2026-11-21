@@ -435,13 +435,20 @@ cue = HeadCue(.forMood("laugh"), generation: cues)       // one of laugh's three
   penguin) shows the state with its own face and one held sticker beside it,
   in the state's colour (or `screenColor:`): `.thinking` the thinking face and
   a thought bubble; `.working` the happy face typing on a small keyboard in
-  front, a soft code flow behind, and every few seconds a look up and aside
+  front, real code flowing up behind (monospace, syntax-coloured, a line every
+  0.35 s, still while it thinks), and every few seconds a look up and aside
   with the bubble; `.needsYou` surprised with one `!` standing behind the head; `.waiting` a glance
   up and a clock in a thought bubble; `.done` a nod and a check behind the head that stays; `.errored` X
   eyes, a head shake every 3 s and a ✕ in a thought bubble; `.asleep` the gentle asleep pose
   with Zs rising beside it. `nil` hands back the neutral face. On a `FaceLife` you draw
   yourself, `agentStickers` is each frame's stickers (`AgentSticker`, in skull
   diameters from the skull's centre). Runtime only: any bake works.
+- The code flow follows your surface: `colorScheme: .light | .dark` on
+  `MinimojiMetalHeadView` gives the code deeper ink on light and brighter neon
+  on dark. `nil` (the default) follows the environment's `colorScheme`; pass
+  your own when the surface behind the head differs from the system's (a dark
+  card in a light app). Under about 40 pt each line draws as one coloured bar
+  per token, since glyphs that small speckle.
 - Over a host's beat (a `performance:` source with `beat`), a cue rides over
   the nod and the nod keeps the beat. A singing app leaves `performances`
   on, passes `emotes: false`, and cues a nod or a double take on its moments.
