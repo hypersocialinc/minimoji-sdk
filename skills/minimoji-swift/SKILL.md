@@ -437,8 +437,8 @@ cue = HeadCue(.forMood("laugh"), generation: cues)       // one of laugh's three
   a thought bubble; `.working` the happy face typing on a small keyboard in
   front, a soft code flow behind, and every few seconds a look up and aside
   with the bubble; `.needsYou` surprised with one `!` standing behind the head; `.waiting` a glance
-  up and a clock behind the head; `.done` a nod and a check behind the head that stays; `.errored` X
-  eyes, a head shake every 3 s and a ✕ behind the head; `.asleep` the gentle asleep pose
+  up and a clock in a thought bubble; `.done` a nod and a check behind the head that stays; `.errored` X
+  eyes, a head shake every 3 s and a ✕ in a thought bubble; `.asleep` the gentle asleep pose
   with Zs rising beside it. `nil` hands back the neutral face. On a `FaceLife` you draw
   yourself, `agentStickers` is each frame's stickers (`AgentSticker`, in skull
   diameters from the skull's centre). Runtime only: any bake works.

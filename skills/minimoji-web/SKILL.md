@@ -865,7 +865,7 @@ export function Reacting({ avatar }: { avatar: AvatarInput }) {
   thinking face and a thought bubble; `'working'` the happy face typing on a
   small keyboard in front of it, a soft code flow behind the head, and every
   few seconds a look up and aside with the bubble; `'needsYou'` surprised with
-  one `!` standing behind the head; `'waiting'` a glance up and a clock behind the head; `'done'` a nod and a check behind the head that stays; `'errored'` X eyes, a head shake every 3 s and a ✕ behind the head; `'asleep'` the gentle asleep pose with Zs rising beside it. Clearing it hands back
+  one `!` standing behind the head; `'waiting'` a glance up and a clock in a thought bubble; `'done'` a nod and a check behind the head that stays; `'errored'` X eyes, a head shake every 3 s and a ✕ in a thought bubble; `'asleep'` the gentle asleep pose with Zs rising beside it. Clearing it hands back
   the neutral face. Same prop, same `stage.setAgentState` / `life.setAgentState`;
   `life.agentStickers()` is what the sticker layer draws (`decorations={false}`
   draws none). Runtime only: any bake works.
