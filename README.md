@@ -56,6 +56,11 @@ Node 20 or later, no dependencies. Prefer no global install? Run
 
 `@minimoji/react` and `@minimoji/heads` (`web/react`, `web/heads`):
 
+- **19.2.0**: ten small D.A.S.H. heads appear in about a second. A D.A.S.H. build took most of a second (every
+  surface pick tested every triangle of its cage, and every plate was extruded anew for every head); the first now
+  takes about 0.2–0.35 s and each one after it about 50–120 ms, the same heads to the byte. A resting head is drawn at its final size from its first
+  frame and swaps without the whirl; `land` on `<MinimojiHead>` chooses either way (default `!rest`). Ten cold
+  resting heads: all drawn about 1 s after the stage mounts, against 7.4 s.
 - **19.1.0**: small heads that cost nothing at rest. `rest` on `<MinimojiHead>` draws a change, lets it play out
   and holds still; a stage whose heads are all held asks for no animation frame and issues no WebGL draw. Only the
   heads that move are drawn, and small resting heads playing D.A.S.H.'s `thinking` or `working` screen draw at

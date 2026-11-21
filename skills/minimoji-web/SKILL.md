@@ -160,6 +160,9 @@ export function SavedHead({ avatar, avatarKey, service }: { avatar: AvatarInput;
   (drawn at save), or any transparent picture of the head. A character has
   no saved picture until it is saved: ship your own still (the homepage
   ships `.webp` stills), or no poster.
+- A small resting D.A.S.H. needs no poster: the first builds in about
+  0.2–0.35 s, the rest about 50–120 ms each, and each draws at its final size
+  from its first frame (§ 8, `rest`).
 - No app CSS: the sheet is a React 19 hoisted `<style>`. Without React's
   hoisting, add `POSTER_CSS` to a stylesheet. `style` re-places the still
   (`{ inset: 'auto', left, top, width, height }`); `puff={false}` drops
@@ -1000,7 +1003,8 @@ the Swift Kit's `MinimojiBody`, or ask Minimoji.
 ## 8. Many heads on a page
 
 - **One stage**, every head in it. Heads build one per animation frame, in
-  mount order, and scale in as they land; scrolling holds builds back.
+  mount order, and scale in as they land (`rest` heads, or `land={false}`:
+  at their final size from the first frame); scrolling holds builds back.
 - Lower `detail` (`.8` on the homepage) before anything else.
 - Under 48 px a head wears the compact arcs by itself; nothing to do.
 - A group sharing a floor: `shadow={false}` on each head and one
@@ -1051,6 +1055,13 @@ export function CrewRail({ crew }: { crew: Agent[] }) {
 
 `theme` is a D.A.S.H. id: `agent`, `dashGold`, `dashRose`, `dashOcean`, …
 
+- A resting head is there when the window is: drawn at its final size from
+  its first frame (no scale-in), and a changed `avatar` or `character` takes
+  its place at once (no whirl). `land` overrides it either way. Ten cold
+  D.A.S.H. heads: the first drawn about 0.6 s after the stage mounts, all ten
+  by about 1 s (Chrome, a busy dev machine; 2.9 and 7.4 s before 19.2.0). The
+  first D.A.S.H. on a page builds in about 0.2–0.35 s (its plates extruded,
+  after the renderer's setup); the rest of a burst about 50–120 ms each.
 - A resting head is built without its breath and drift and looks straight
   out of its tile (`look` as `{x,y}` or `'manual'` still applies). A change
   (`agentState`, `expression`, `screenColor`, a cue, talking, a resize) is

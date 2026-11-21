@@ -464,12 +464,16 @@ export interface MinimojiHeadProps {
    *  drawing. Driving `head.life` yourself: call `ref.wake()` after. Default false
    *  (heads breathe, blink and glance as always). Changing it rebuilds the head: set it once */
   rest?: boolean;
+  /** LANDING: true, a first head scales in with a soft bounce and a new head (a changed `avatar` or `character`)
+   *  whirls in (the old head spins out and the new one in: swap.js); false, each is drawn at its final size from its first frame and takes the
+   *  old one's place at once. Default: `!rest` (a resting head is there when the window is; a head on a page lands) */
+  land?: boolean;
   onFrame?: (head: Head, t: number, offsets: HeadOffsets) => void;
   onReady?: (head: Head) => void;
   /** the build threw (also logged): the head on stage, if any, is the one before */
   onError?: (error: unknown) => void;
 }
-/** a head on the stage. Heads build one per animation frame, in mount order, and scale in with a soft bounce as they land */
+/** a head on the stage. Heads build one per animation frame, in mount order, and scale in with a soft bounce as they land (a resting head, or `land={false}`: at its final size from its first frame) */
 export function MinimojiHead(props: MinimojiHeadProps): ReactNode;
 
 export interface MinimojiShadowProps {
