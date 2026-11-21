@@ -1006,7 +1006,11 @@ the Swift Kit's `MinimojiBody`, or ask Minimoji.
 ### A baked head (a bake's GLB, no avatar document)
 
 When you hold a bake rather than a document (`GET /avatars/<key>.glb`, or
-bytes your server stored), draw it as it is:
+bytes your server stored), draw it as it is. A small one comes as
+`?detail=.25&lite=1` (no effect plates); for a D.A.S.H. you drive with
+`agentState`, ask `lite=agent` (`POST /avatars/bake` `{lite: "agent"}`):
+lite, but it keeps his agent screens, which `lite=1` leaves out (`MinimojiHead`
+builds from the document and always has them):
 
 ```js
 import { prepareBakedHead, buildBakedHead } from '@minimoji/react';

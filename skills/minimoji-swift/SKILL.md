@@ -203,6 +203,14 @@ MinimojiMetalHeadView(document: theirs).frame(width: 96, height: 96)
   emote); later changes blend and emote.
 - Below 64 pt fetch `detail: .25, lite: true` and run `frameRate:
   .reduced` (34–63 pt) or `.low` (under 34 pt); see the README's size table.
+- A small D.A.S.H. you drive with `agentState:` takes `lite: .agent`
+  (`AvatarService.Lite`): lite, but it keeps his agent screens (the dots,
+  code, check and `!`), which `lite: true` leaves out. About 4.3 MB at
+  `detail: .25` (684 KB over the wire) against 3.2 MB plain lite and 6.6 MB
+  for the default `.4` full bake: `service.head(for: CharacterSelection(id:
+  "agent"), detail: 0.25, lite: .agent)`; `head(forKey:)` and
+  `headURL(forKey:)` take it too. A person at `.agent` is the service's
+  bake (the device builder makes `.on`/`.off` only).
 
 ### Showing a head while it loads
 
