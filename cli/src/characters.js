@@ -63,6 +63,8 @@ export async function loadAuthoring(ctx, project, { avoid = null } = {}) {
   throw usageError("@minimoji/authoring is not installed in this project; run npm install in the character folder (or set MINIMOJI_AUTHORING)");
 }
 
+// what a variant costs to build (full detail), beside what it costs to draw; ms is this machine's, information only
+const buildLine = (b) => b ? `    build: ${b.rays} rays, ${b.plates} plates, ${(b.plateBytes / 1e6).toFixed(1)} MB extruded (${b.plateVertices} vertices)${b.subdivide ? `, skull subdivide ${b.subdivide}` : ""}, ${b.ms} ms on this machine` : null;
 const line = (d) => `  ${d.severity === "warning" ? "warn" : "error"} ${d.code}${d.variant ? ` [${d.variant}]` : ""}${d.path ? ` at ${d.path}` : ""}: ${d.message}${d.hint ? `\n        → ${d.hint}` : ""}`;
 
 export async function characters(ctx, _base, opts, out, positionals) {
@@ -146,11 +148,11 @@ export async function characters(ctx, _base, opts, out, positionals) {
         await A.listSources(project, character);
         const built = await A.buildVariants(character, { target });
         result = { ok: built.ok, diagnostics: built.diagnostics, profile: A.profileFor(target),
-          variants: built.variants.map((v) => ({ id: v.variant, sha256: v.sha256, bytes: v.stats.bytes, vertices: v.stats.vertices, capabilities: v.capabilities })) };
+          variants: built.variants.map((v) => ({ id: v.variant, sha256: v.sha256, bytes: v.stats.bytes, vertices: v.stats.vertices, meshes: v.stats.meshes, build: v.stats.build, capabilities: v.capabilities })) };
       }
       const data = { ok: result.ok, kind: pack ? "pack" : "project", target, profile: result.profile, variants: result.variants ?? result.manifest?.variants ?? [], diagnostics: result.diagnostics };
       const human = [`${result.ok ? "valid" : "invalid"} ${pack ? "pack" : "project"} for ${target} (≤ ${result.profile.maxGlbBytes} bytes per GLB, ≤ ${result.profile.maxVariants} variants)`,
-        ...data.variants.map((v) => `  ${v.id}  ${v.sha256}  ${v.bytes} bytes`), ...result.diagnostics.map(line)].join("\n");
+        ...data.variants.flatMap((v) => [`  ${v.id}  ${v.sha256}  ${v.bytes} bytes${v.vertices != null ? `, ${v.vertices} vertices in ${v.meshes} meshes` : ""}`, buildLine(v.build)].filter(Boolean)), ...result.diagnostics.map(line)].join("\n");
       if (!result.ok) return fail(1, data, human);
       return out(data, human);
     }
@@ -163,7 +165,7 @@ export async function characters(ctx, _base, opts, out, positionals) {
         variants: result.manifest?.variants ?? [], capabilities: result.manifest?.capabilities ?? null, diagnostics: result.diagnostics };
       if (!result.ok) return fail(1, data, [`pack failed; ${dest} was not changed`, ...result.diagnostics.map(line)].join("\n"));
       return out(data, [`packed ${result.manifest.id} → ${dest}`, `  digest ${result.manifest.digest}`,
-        ...result.manifest.variants.map((v) => `  runtime/${v.file}  ${v.bytes} bytes`), "  source/ (your editable project), review/report.json", ...result.diagnostics.map(line)].join("\n"));
+        ...result.manifest.variants.flatMap((v) => [`  runtime/${v.file}  ${v.bytes} bytes`, buildLine(result.build?.[v.id])].filter(Boolean)), "  source/ (your editable project), review/report.json", ...result.diagnostics.map(line)].join("\n"));
     }
     // dev: runs until interrupted (ctx.signal in tests)
     const port = opts.port == null ? 0 : Number(opts.port);

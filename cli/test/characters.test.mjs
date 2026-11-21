@@ -36,6 +36,11 @@ test("characters create → validate → pack → validate the pack, with JSON a
     assert.equal(v.code, 0, v.stdout);
     assert.equal(v.json.ok, true); assert.equal(v.json.kind, "project");
     assert.deepEqual(v.json.variants.map((x) => x.id), ["mast", "dish"]);
+    // the build cost beside the draw cost: the numbers in JSON, and a build line in the human output
+    assert.ok(v.json.variants.every((x) => x.build.plates > 0 && x.build.plateBytes > 0 && x.build.rays >= 0), JSON.stringify(v.json.variants[0].build));
+    const validateHuman = await run(ctx, ["characters", "validate", "--project", "relay"]);
+    assert.equal(validateHuman.code, 0);
+    assert.match(validateHuman.stdout, /build: \d+ rays, \d+ plates, [\d.]+ MB extruded \(\d+ vertices\)/);
     // hyperdecks profile v4: its player shows a masked robot's speech (export then needs Hyperdecks CLI 0.9.19+)
     const hd = await run(ctx, ["characters", "validate", "--project", "relay", "--target", "hyperdecks", "--json"]);
     assert.equal(hd.code, 0, hd.stdout);
@@ -47,6 +52,8 @@ test("characters create → validate → pack → validate the pack, with JSON a
     assert.equal(p.json.capabilities.speech, "indicator");
     const again = await run(ctx, ["characters", "pack", "--project", "relay", "--out", "relay/dist/again", "--json"]);
     assert.equal(again.json.digest, p.json.digest, "deterministic");
+    const packHuman = await run(ctx, ["characters", "pack", "--project", "relay", "--out", "relay/dist/human"]);
+    assert.match(packHuman.stdout, /runtime\/mast\.glb {2}\d+ bytes\n {4}build: \d+ rays, \d+ plates/);
     assert.ok(!p.stdout.includes("token") && !p.stdout.includes("mk_"), "no credentials in JSON");
 
     // a pack is data: a toolkit planted inside it is never loaded, even when validating from within it
