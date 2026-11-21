@@ -419,9 +419,21 @@ cue = HeadCue(.forMood("laugh"), generation: cues)       // one of laugh's three
   mouth, an RGB glitch), `.asleep` (closed eyes). Each state has its own
   colour; pass your app's with `screenColor: "#ff9f43"` and `screenGlass:`
   (about `0.3` keeps the glass dark, `2.2` floods it). `nil` (the default)
-  leaves the screen exactly as it was, and a head of skin ignores both. A
+  leaves the screen exactly as it was. A
   string from a server: `AgentState(id: "needs-you")`. On a `FaceLife`:
   `setAgentState(_:color:glass:)` and `setScreenColor(_:glass:)`.
+- Agent states on every head: `agentState:` works on every Mini avatar, not
+  only D.A.S.H. A head without a screen (a person, an animal, the ghost, the
+  penguin) shows the state with its own face and one held sticker beside it,
+  in the state's colour (or `screenColor:`): `.thinking` the thinking face and
+  a thought bubble; `.working` the happy face typing on a small keyboard in
+  front, a soft code flow behind, and every few seconds a look up and aside
+  with the bubble; `.needsYou` surprised with one `!` standing behind the head; `.waiting` a glance
+  up and a clock behind the head; `.done` a nod and a check behind the head that stays; `.errored` X
+  eyes, a head shake every 3 s and a ✕ behind the head; `.asleep` the gentle asleep pose
+  with Zs rising beside it. `nil` hands back the neutral face. On a `FaceLife` you draw
+  yourself, `agentStickers` is each frame's stickers (`AgentSticker`, in skull
+  diameters from the skull's centre). Runtime only: any bake works.
 - Over a host's beat (a `performance:` source with `beat`), a cue rides over
   the nod and the nod keeps the beat. A singing app leaves `performances`
   on, passes `emotes: false`, and cues a nod or a double take on its moments.

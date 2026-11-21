@@ -54,8 +54,9 @@ export interface HeadPerformanceOptions {
   poster?: HeadPoster | string | null;
   /** a screen face's (D.A.S.H.'s) CRT look, scanlines and glass following the mood: 0 off, 1 (the default), 2 loud. A head of skin ignores it */
   crt?: 0 | 1 | 2;
-  /** what D.A.S.H.'s screen shows for an agent (bake 19): 'thinking' | 'working' | 'needsYou' | 'waiting' | 'done' |
-   *  'errored' | 'asleep'; null (the default) leaves the screen as it was. A head of skin ignores it */
+  /** what the head shows for an agent: 'thinking' | 'working' | 'needsYou' | 'waiting' | 'done' | 'errored' | 'asleep'.
+   *  D.A.S.H.'s screen shows it (bake 19); any other head its own face and one held sticker (working: a keyboard).
+   *  null (the default) leaves the head as it was */
   agentState?: string | null;
   /** a screen face's glass colour over every mood and agent state, `#rrggbb`; null leaves it */
   screenColor?: string | null;
@@ -125,7 +126,7 @@ export interface HeadPerformanceStage {
   /** recolour the solo baked head by colour slot, live (no reload); throws on an unknown slot, a colour that is not
    *  #rrggbb or a head with no slot map. A slot with no parts on this variant changes nothing */
   setColors(colors: Readonly<Record<string, string>>): void;
-  /** D.A.S.H.'s screen shows what an agent is doing (see `agentState`); `color`/`glass` override the state's own colour */
+  /** what an agent is doing, on every head (see `agentState`); `color`/`glass` override the state's own colour */
   setAgentState(state: string | null, opts?: { color?: string; glass?: number }): void;
   /** light a screen face's glass in `hex` over every mood (`glass`: ≈.3 dark, 2.2 flooded); null hands it back */
   setScreenColor(hex: string | null, opts?: { glass?: number }): void;

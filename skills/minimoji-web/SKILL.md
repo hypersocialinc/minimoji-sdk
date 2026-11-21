@@ -853,11 +853,22 @@ export function Reacting({ avatar }: { avatar: AvatarInput }) {
   has its own colour; pass your app's with `screenColor="#ff9f43"` (and
   `screenGlass`: about `.3` keeps the glass dark so only the face lights,
   `2.2` floods it). `null` (the default) leaves the screen exactly as it
-  was, and a head of skin ignores both. Vanilla bundle:
+  was. Vanilla bundle:
   `mountHeadPerformance(el, { agentState: 'working' })`, then
   `stage.setAgentState('done')` / `stage.setScreenColor('#4ade80', { glass: .3 })`;
   on a runtime, `life.setAgentState(state, { color, glass })` and
   `life.setScreenColor(hex, { glass })`.
+- **Agent states on every head**: `agentState` works on every Mini avatar, not
+  only D.A.S.H. A head without a screen (a person, an animal, the ghost, the
+  penguin) shows the state with its own face and one held sticker beside it,
+  in the state's colour (or yours, from `screenColor`): `'thinking'` the
+  thinking face and a thought bubble; `'working'` the happy face typing on a
+  small keyboard in front of it, a soft code flow behind the head, and every
+  few seconds a look up and aside with the bubble; `'needsYou'` surprised with
+  one `!` standing behind the head; `'waiting'` a glance up and a clock behind the head; `'done'` a nod and a check behind the head that stays; `'errored'` X eyes, a head shake every 3 s and a ✕ behind the head; `'asleep'` the gentle asleep pose with Zs rising beside it. Clearing it hands back
+  the neutral face. Same prop, same `stage.setAgentState` / `life.setAgentState`;
+  `life.agentStickers()` is what the sticker layer draws (`decorations={false}`
+  draws none). Runtime only: any bake works.
 - `cue={{ gesture }}` plays one named track over the face as it is (the
   face never changes): `double-take`, `head-shake`, `sunny-nod`,
   `knowing-nod`, `ponder-tilt`, `side-eye-hmm`, `lightbulb`, … (the

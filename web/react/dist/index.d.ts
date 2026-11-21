@@ -248,10 +248,13 @@ export interface FaceApi {
    *  null hands it back to the mood (or the agent state's own colour); it wins over an agent state's colour */
   setScreenColor(hex: string | null, opts?: { glass?: number }): void;
   screenColor(): { hex: string; glass: number } | null;
-  /** what D.A.S.H.'s screen shows for an agent; null for none. Sets the state's base face and screen colour
-   *  (`color`/`glass` override it). Unknown ids and heads of skin ignore it */
+  /** what the head shows for an agent; null for none. D.A.S.H.'s screen shows it; any other head shows it with its
+   *  own face and a held sticker (`agentStickers`). `color`/`glass` override the state's colour. Unknown ids are ignored */
   setAgentState(state: AgentState | null, opts?: { color?: string; glass?: number }): void;
   agentState(): Exclude<AgentState, 'needs-you'> | null;
+  /** a head without a screen in an agent state: this frame's stickers (skull diameters from the skull's centre, y up;
+   *  `rot` in degrees) and their colour; null with no state, and always on a screen head */
+  agentStickers(): { color: string; stickers: Array<{ kind: 'thought' | 'keyboard' | 'codeflow' | 'check' | 'cross' | 'clock' | 'bang' | 'sparkle'; x: number; y: number; size: number; rot: number; alpha: number; t: number; back?: boolean; typing?: boolean; key?: number }> } | null;
   /** an unknown style is ignored */
   setTalkStyle(style: TalkStyle): void;
   talkStyle(): TalkStyle;
@@ -382,9 +385,10 @@ export interface MinimojiHeadProps {
   /** a screen face's (D.A.S.H.'s) CRT look, its scanlines and glass following the mood: 0 off, 1 (the default), 2 loud.
    *  A head of skin ignores it */
   crt?: ScreenCrt;
-  /** what D.A.S.H.'s screen shows for an agent (bake 19): 'thinking' (a wave of three neon dots), 'working' (code flowing
-   *  up), or his face for 'needsYou' | 'waiting' | 'done' | 'errored' | 'asleep' in the state's colour. null (the default)
-   *  leaves the screen exactly as it was. A head of skin ignores it */
+  /** what the head shows for an agent: on D.A.S.H. his screen (bake 19): 'thinking' (a wave of three neon dots), 'working'
+   *  (code flowing up), or his face for 'needsYou' | 'waiting' | 'done' | 'errored' | 'asleep' in the state's colour. Any
+   *  other head shows it with its own face and one held sticker in the state's colour (or `screenColor`); 'working' types
+   *  on a small keyboard. null (the default) leaves the head exactly as it was */
   agentState?: AgentState | null;
   /** a screen face's glass colour over every mood and agent state, `#rrggbb` (e.g. your app's own state colour); null leaves it */
   screenColor?: string | null;
