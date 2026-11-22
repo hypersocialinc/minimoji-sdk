@@ -998,6 +998,8 @@ export function Friend({ avatar, online, typing, music }: { avatar: AvatarInput;
   plays the wake-up. `{ state: 'asleep', z: true, roll: ASLEEP_GENTLE_ROLL }`
   (exported, 16° in radians) stops the head at a gentle roll instead, the Zs
   upright and the snore kept; the matching still is `.png?face=asleep` (no Zs).
+  A presence set as the head lands (in `onReady`, as above; within its first 0.25 s) is its
+  mount presence: asleep at once, no doze-in. A later change eases.
 - `think(true)`: the typing state, a thinking face with a looping tilt;
   any speech takes the mouth at once.
 - `onReady` hands you the `Head` (and again after the avatar changes);

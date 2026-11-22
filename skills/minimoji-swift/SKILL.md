@@ -270,6 +270,8 @@ let cast = try await service.characters()   // ids, names, families, pick axes; 
 - Asleep at a gentle angle: `presence: .asleep(z: true, roll: FaceLife.asleepGentleRoll)`
   (16°; the Zs upright, the snore kept; no `roll` is today's droop/lie-down);
   the matching still is `<service>/avatars/<key>.png?size=256&face=asleep` (no Zs).
+- A head mounted with `presence: .asleep(…)` is asleep on its first frame (no doze-in); only a
+  change on screen eases. Don't hold the head still to hide a doze-in.
 - Play it like a person: expressions, `HeadCue`, listening, presence,
   `SpeechVoice` / `SingingVoice` through one `AvatarPerformanceInput`. No
   per-species host code; D.A.S.H. draws the mouth on its screen.
