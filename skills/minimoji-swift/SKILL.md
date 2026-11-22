@@ -203,6 +203,15 @@ MinimojiMetalHeadView(document: theirs).frame(width: 96, height: 96)
   emote); later changes blend and emote.
 - Below 64 pt fetch `detail: .25, lite: true` and run `frameRate:
   .reduced` (34–63 pt) or `.low` (under 34 pt); see the README's size table.
+- A status head that mostly waits (a dock, a grid tile, a crew rail) takes
+  `rest: true`: no breath or drift, it looks out, draws at `restFrameRate:`
+  (15 fps) while idle and at full rate while a face change, cue, talking,
+  blink or thinking/working agent state plays. Ten idle resting heads cost
+  about a quarter of the CPU and a tenth of the GPU of ten ordinary ones.
+- Heads pause themselves when nobody can see them (off window, hidden,
+  scrolled away, scene inactive) and resume without a jump; `autoPause:
+  false` opts out, `isActive: false` still pauses. Don't add your own
+  on-appear/disappear `isActive` toggling just for visibility.
 - A small D.A.S.H. you drive with `agentState:` takes `lite: .agent`
   (`AvatarService.Lite`): lite, but it keeps his agent screens (the dots,
   code, check and `!`), which `lite: true` leaves out. About 4.3 MB at
