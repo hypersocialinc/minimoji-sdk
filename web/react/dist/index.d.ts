@@ -87,7 +87,7 @@ export type TalkStyle = 'arcs' | 'lines' | 'mouth';
 export type ScreenCrt = 0 | 1 | 2;
 /** what D.A.S.H.'s screen shows for an agent (bake 19): a thinking wave, working code flowing up, or his face in the
  *  state's colour on dark glass ('needs-you' and 'needs_you' are 'needsYou') */
-export type AgentState = 'thinking' | 'working' | 'needsYou' | 'needs-you' | 'waiting' | 'done' | 'errored' | 'asleep';
+export type AgentState = 'thinking' | 'working' | 'needsYou' | 'needs-you' | 'waiting' | 'done' | 'errored' | 'asleep' | 'connecting';
 /** sampled once per rendered frame, right before the head's update; `t` is the stage clock in seconds */
 export type PerformanceInput = (t: number) => PerformanceSnapshot | null | undefined;
 
@@ -249,9 +249,18 @@ export interface FaceApi {
   setScreenColor(hex: string | null, opts?: { glass?: number }): void;
   screenColor(): { hex: string; glass: number } | null;
   /** what the head shows for an agent; null for none. D.A.S.H.'s screen shows it; any other head shows it with its
-   *  own face and a held sticker (`agentStickers`). `color`/`glass` override the state's colour. Unknown ids are ignored */
-  setAgentState(state: AgentState | null, opts?: { color?: string; glass?: number }): void;
+   *  own face and a held sticker (`agentStickers`). `color`/`glass` override the state's colour (on 'connecting', the
+   *  wave's), `barColor` its progress bar's (default `#fff200`). Unknown ids are ignored */
+  setAgentState(state: AgentState | null, opts?: { color?: string; glass?: number; barColor?: string }): void;
   agentState(): Exclude<AgentState, 'needs-you'> | null;
+  /** 'connecting's progress bar: 0..1 (clamped), null for none (only a pulse at its start). It can change while the
+   *  screen shows: the bar eases to it (~.3 s; it jumps with `performances: false`). It outlives the state */
+  setAgentProgress(value: number | null): void;
+  agentProgress(): number | null;
+  /** 'connecting's 128 dot brightnesses this frame (16 × 8, row-major, the bar row last), or null */
+  agentDots(): number[] | null;
+  /** 'connecting's colours (`#rrggbb`): the wave's (the state's own or its `color`) and the bar's (`barColor`) */
+  agentDotColors(): { wave: string; bar: string };
   /** a head without a screen in an agent state: this frame's stickers (skull diameters from the skull's centre, y up;
    *  `rot` in degrees) and their colour; null with no state, and always on a screen head */
   agentStickers(): { color: string; stickers: Array<{ kind: 'thought' | 'keyboard' | 'codeflow' | 'check' | 'cross' | 'clock' | 'bang' | 'sparkle'; x: number; y: number; size: number; rot: number; alpha: number; t: number; back?: boolean; typing?: boolean; key?: number }> } | null;
@@ -410,8 +419,13 @@ export interface MinimojiHeadProps {
   /** what the head shows for an agent: on D.A.S.H. his screen (bake 19): 'thinking' (a wave of three neon dots), 'working'
    *  (code flowing up), or his face for 'needsYou' | 'waiting' | 'done' | 'errored' | 'asleep' in the state's colour. Any
    *  other head shows it with its own face and one held sticker in the state's colour (or `screenColor`); 'working' types
-   *  on a small keyboard. null (the default) leaves the head exactly as it was */
+   *  on a small keyboard. 'connecting' turns his screen into a 16 × 8 dot matrix, a mint wave scrolling over a yellow
+   *  progress bar (`agentProgress`); any other head thinks for it, as for 'thinking'. null (the default) leaves the
+   *  head exactly as it was */
   agentState?: AgentState | null;
+  /** 'connecting's progress bar, 0..1 (clamped): a host with four steps sends 0, .25, .5, .75, 1, and the bar eases to
+   *  each. null (the default) shows only a pulse at its start */
+  agentProgress?: number | null;
   /** the surface this head sits on: the 'working' code flow behind a head without a screen is syntax-coloured code in
    *  deeper ink on 'light' and brighter neon on 'dark' (below ~40 css px, one bar per token). null (the default) takes
    *  the stage's `theme`, then the page's `prefers-color-scheme` */

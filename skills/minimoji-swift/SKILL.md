@@ -440,7 +440,17 @@ cue = HeadCue(.forMood("laugh"), generation: cues)       // one of laugh's three
   (about `0.3` keeps the glass dark, `2.2` floods it). `nil` (the default)
   leaves the screen exactly as it was. A
   string from a server: `AgentState(id: "needs-you")`. On a `FaceLife`:
-  `setAgentState(_:color:glass:)` and `setScreenColor(_:glass:)`.
+  `setAgentState(_:color:glass:barColor:)` and `setScreenColor(_:glass:)`.
+- Connecting with progress: `agentState: .connecting` plus
+  `agentProgress: 0.5` on `MinimojiMetalHeadView` turns D.A.S.H.'s screen into
+  a 16 × 8 dot matrix, a mint wave scrolling over a yellow progress bar you
+  fill, `0...1` (clamped; it eases to each new value; `nil` shows only a pulse
+  at its start). Send discrete steps (0, 0.25, 0.5, 0.75, 1) as your connect
+  steps finish; don't draw your own bar under him. `color:` recolours the
+  wave, `barColor:` the bar (`FaceLife.setAgentState`); on a `FaceLife`,
+  `setAgentProgress(_:)`. Every bake 19 Dash shows it, a `lite: .agent` one
+  too; any other head thinks, as for `.thinking`. Reduce Motion holds the
+  wave still and the bar still follows the value.
 - Agent states on every head: `agentState:` works on every Mini avatar, not
   only D.A.S.H. A head without a screen (a person, an animal, the ghost, the
   penguin) shows the state with its own face and one held sticker beside it,
